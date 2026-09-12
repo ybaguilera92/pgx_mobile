@@ -1,9 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import { IconButton } from 'react-native-paper';
 import jsQR from 'jsqr';
-import { Camera, Upload, X, AlertCircle, RefreshCw, Check } from 'lucide-react';
 
 interface QrCodeScanProps {
-  onClear: () => void;
+  onClear: (val: boolean) => void;
   qrScanValue: (value: string) => void;
   isLandscape?: boolean;
 }
@@ -14,26 +22,22 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [manualMode, setManualMode] = useState(false);
 
+  // Web camera refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Validate QR payload structure
   const handleQrDetected = (codeText: string) => {
     setIsProcessing(true);
-    try {
-      // Check if it's JSON with Key and AccesionNumber or plain string
-      qrScanValue(codeText);
-      stopCamera();
-      onClear();
-    } catch (err: any) {
-      setErrorMessage('Could not process the detected QR code.');
-      setIsProcessing(false);
-    }
+    qrScanValue(codeText);
+    stopWebCamera();
+    onClear(false);
   };
 
-  const startCamera = async () => {
+  const startWebCamera = async () => {
+    if (Platform.OS !== 'web') return;
     setErrorMessage('');
     try {
       const constraints: MediaStreamConstraints = {
@@ -50,23 +54,19 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', 'true'); // Required for iOS safari
+        videoRef.current.setAttribute('playsinline', 'true');
         await videoRef.current.play();
-        requestAnimationFrame(tick);
+        requestAnimationFrame(scanTick);
       }
     } catch (err: any) {
-      console.warn('Camera access failed:', err);
+      console.warn('Camera error:', err);
       setHasPermission(false);
-      setErrorMessage(
-        err.name === 'NotAllowedError'
-          ? 'Camera permission was denied. You can grant camera access or upload an image of your QR code below.'
-          : 'Could not access device camera. You can upload an image of your QR code below.'
-      );
+      setErrorMessage('Could not open camera. You can upload an image of your QR code below.');
       setManualMode(true);
     }
   };
 
-  const stopCamera = () => {
+  const stopWebCamera = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -77,9 +77,9 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
     }
   };
 
-  const tick = () => {
+  const scanTick = () => {
     if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      animationFrameRef.current = requestAnimationFrame(tick);
+      animationFrameRef.current = requestAnimationFrame(scanTick);
       return;
     }
 
@@ -104,18 +104,19 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
       return;
     }
 
-    animationFrameRef.current = requestAnimationFrame(tick);
+    animationFrameRef.current = requestAnimationFrame(scanTick);
   };
 
   useEffect(() => {
-    startCamera();
+    if (Platform.OS === 'web') {
+      startWebCamera();
+    }
     return () => {
-      stopCamera();
+      stopWebCamera();
     };
   }, []);
 
-  // Image file QR decoder (matching mobile QRLocalImage capability)
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -130,7 +131,7 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           setIsProcessing(false);
-          setErrorMessage('Could not initialize canvas context.');
+          setErrorMessage('Failed to create decoding canvas.');
           return;
         }
 
@@ -147,12 +148,12 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
           handleQrDetected(code.data);
         } else {
           setIsProcessing(false);
-          setErrorMessage('No QR code could be detected in this image. Please ensure the code is clear and try again.');
+          setErrorMessage('No QR code found in this image. Please try another image.');
         }
       };
       img.onerror = () => {
         setIsProcessing(false);
-        setErrorMessage('Failed to load the selected image file.');
+        setErrorMessage('Failed to read image file.');
       };
       img.src = event.target?.result as string;
     };
@@ -160,146 +161,319 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
   };
 
   return (
-    <div
-      id="qr-scan-container"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white animate-fadeIn"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-10">
-        <div className="flex items-center gap-2">
-          <Camera className="w-5 h-5 text-[#3C8DBC]" />
-          <h2 className="text-base font-semibold text-white">Scan PGx QR Code</h2>
-        </div>
-        <button
-          id="close-qr-scan-btn"
-          type="button"
-          onClick={() => {
-            stopCamera();
-            onClear();
+    <View style={styles.container}>
+      {/* Header bar */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Scan PGx QR Code</Text>
+        <IconButton
+          icon="close"
+          iconColor="#ffffff"
+          size={24}
+          onPress={() => {
+            stopWebCamera();
+            onClear(false);
           }}
-          className="rounded-full p-2 text-slate-300 hover:text-white hover:bg-slate-800 transition"
-          aria-label="Close scanner"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
+        />
+      </View>
 
       {/* Main Viewport */}
-      <div className="relative flex-1 flex flex-col items-center justify-center overflow-hidden">
-        <video
-          ref={videoRef}
-          className={`absolute inset-0 w-full h-full object-cover ${manualMode ? 'hidden' : 'block'}`}
-          muted
-        />
-        <canvas ref={canvasRef} className="hidden" />
-
-        {/* Viewfinder Overlay */}
-        {!manualMode && hasPermission && (
-          <div className="relative z-10 flex flex-col items-center justify-center pointer-events-none">
-            <div className="w-64 h-64 sm:w-80 sm:h-80 border-2 border-white/80 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]">
-              {/* Corner markers */}
-              <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-[#3C8DBC] rounded-tl-lg" />
-              <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-[#3C8DBC] rounded-tr-lg" />
-              <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-[#3C8DBC] rounded-bl-lg" />
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-[#3C8DBC] rounded-br-lg" />
-
-              {/* Scanning laser effect */}
-              <div className="absolute inset-x-0 top-0 h-1 bg-[#3C8DBC] shadow-[0_0_8px_#3C8DBC] animate-pulse" />
-            </div>
-            <p className="mt-6 text-sm font-medium text-slate-200 bg-slate-900/70 px-4 py-1.5 rounded-full backdrop-blur-sm">
-              Align the QR code within the box
-            </p>
-          </div>
+      <View style={styles.scannerArea}>
+        {Platform.OS === 'web' && (
+          <>
+            <video
+              ref={videoRef}
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: manualMode ? 'none' : 'block',
+              }}
+              muted
+            />
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
+          </>
         )}
 
-        {/* Fallback / Upload / Manual view */}
-        {manualMode && (
-          <div className="z-10 max-w-md w-full p-6 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
-              <Upload className="w-8 h-8 text-[#3C8DBC]" />
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Upload QR Code Image</h3>
-            <p className="text-sm text-slate-400 mb-6">
-              Select or drag an image containing your PGx report QR code to scan it automatically.
-            </p>
+        {/* Viewfinder Target */}
+        {!manualMode && (
+          <View style={styles.targetContainer}>
+            <View style={styles.targetBox}>
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
+              <View style={styles.laserLine} />
+            </View>
+            <Text style={styles.instructionText}>Align the QR code within the frame</Text>
+          </View>
+        )}
 
-            <label
-              id="upload-qr-input-label"
-              className="inline-flex items-center gap-2 px-5 py-3 bg-[#002E62] hover:bg-[#00224a] text-white font-medium text-sm rounded-xl cursor-pointer shadow-lg transition border border-[#3C8DBC]/30"
-            >
-              <Upload className="w-4 h-4" />
-              Choose QR Image
+        {/* Manual Image Upload Mode */}
+        {manualMode && (
+          <View style={styles.manualContainer}>
+            <Text style={styles.manualTitle}>Upload QR Code Image</Text>
+            <Text style={styles.manualSubtitle}>
+              Select an image containing your PGx report QR code to scan it.
+            </Text>
+
+            {Platform.OS === 'web' && (
               <input
-                id="upload-qr-input"
+                ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
+                onChange={handleImageFile}
+                style={{ display: 'none' }}
               />
-            </label>
+            )}
+
+            <TouchableOpacity
+              style={styles.uploadButton}
+              onPress={() => {
+                if (Platform.OS === 'web' && fileInputRef.current) {
+                  fileInputRef.current.click();
+                }
+              }}
+            >
+              <Text style={styles.uploadButtonText}>Choose Image</Text>
+            </TouchableOpacity>
 
             {hasPermission === false && (
-              <button
-                type="button"
-                onClick={startCamera}
-                className="block mt-4 mx-auto text-xs text-[#3C8DBC] hover:underline"
-              >
-                Retry camera access
-              </button>
+              <TouchableOpacity onPress={startWebCamera} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Retry camera access</Text>
+              </TouchableOpacity>
             )}
-          </div>
+          </View>
         )}
 
-        {/* Error message banner */}
-        {errorMessage && (
-          <div className="absolute top-4 left-4 right-4 z-20 flex items-center gap-2 p-3 bg-red-900/90 border border-red-700 text-red-100 rounded-xl text-xs backdrop-blur-sm">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        {/* Error notification */}
+        {errorMessage ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>{errorMessage}</Text>
+          </View>
+        ) : null}
 
-        {/* Processing indicator */}
+        {/* Processing Spinner */}
         {isProcessing && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/70 backdrop-blur-xs">
-            <RefreshCw className="w-10 h-10 text-[#3C8DBC] animate-spin mb-3" />
-            <p className="text-sm font-semibold text-white">Processing QR Code...</p>
-          </div>
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#3C8DBC" />
+            <Text style={styles.loadingText}>Processing QR Code...</Text>
+          </View>
         )}
-      </div>
+      </View>
 
       {/* Footer controls */}
-      <div className="p-4 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between z-10">
-        <button
-          id="toggle-upload-mode-btn"
-          type="button"
-          onClick={() => setManualMode(!manualMode)}
-          className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition"
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.toggleModeBtn}
+          onPress={() => setManualMode(!manualMode)}
         >
-          {manualMode ? (
-            <>
-              <Camera className="w-4 h-4 text-[#3C8DBC]" />
-              Switch to Live Camera
-            </>
-          ) : (
-            <>
-              <Upload className="w-4 h-4 text-[#3C8DBC]" />
-              Upload Image Instead
-            </>
-          )}
-        </button>
+          <Text style={styles.toggleModeText}>
+            {manualMode ? 'Switch to Live Camera' : 'Upload Image Instead'}
+          </Text>
+        </TouchableOpacity>
 
-        <button
-          id="cancel-qr-scan-btn"
-          type="button"
-          onClick={() => {
-            stopCamera();
-            onClear();
+        <TouchableOpacity
+          onPress={() => {
+            stopWebCamera();
+            onClear(false);
           }}
-          className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-slate-200"
+          style={styles.cancelBtn}
         >
-          Cancel
-        </button>
-      </div>
-    </div>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#020617',
+    justifyContent: 'space-between',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    zIndex: 10,
+  },
+  headerTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  scannerArea: {
+    flex: 1,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  targetContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
+  targetBox: {
+    width: 260,
+    height: 260,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  corner: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderColor: '#3C8DBC',
+  },
+  topLeft: {
+    top: -2,
+    left: -2,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 10,
+  },
+  topRight: {
+    top: -2,
+    right: -2,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 10,
+  },
+  bottomLeft: {
+    bottom: -2,
+    left: -2,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 10,
+  },
+  bottomRight: {
+    bottom: -2,
+    right: -2,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 10,
+  },
+  laserLine: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    top: '50%',
+    height: 2,
+    backgroundColor: '#3C8DBC',
+  },
+  instructionText: {
+    color: '#f1f5f9',
+    marginTop: 20,
+    fontSize: 13,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  manualContainer: {
+    padding: 24,
+    alignItems: 'center',
+    maxWidth: 380,
+    zIndex: 5,
+  },
+  manualTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  manualSubtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  uploadButton: {
+    backgroundColor: '#002E62',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(60, 141, 188, 0.4)',
+  },
+  uploadButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  retryBtn: {
+    marginTop: 16,
+  },
+  retryText: {
+    color: '#3C8DBC',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  errorBanner: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(185, 28, 28, 0.9)',
+    padding: 10,
+    borderRadius: 8,
+    zIndex: 20,
+  },
+  errorBannerText: {
+    color: '#fee2e2',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 25,
+  },
+  loadingText: {
+    color: '#ffffff',
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    zIndex: 10,
+  },
+  toggleModeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+  },
+  toggleModeText: {
+    color: '#3C8DBC',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  cancelBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  cancelText: {
+    color: '#94a3b8',
+    fontSize: 12,
+  },
+});

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { useForm } from 'react-hook-form';
-import { Search, Download, Eye, EyeOff, FileText, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { StyleSheet, View, Text, Platform, Alert, TouchableOpacity } from 'react-native';
+import { TextInput, Button, HelperText, useTheme } from 'react-native-paper';
+import { useForm, Controller } from 'react-hook-form';
 import { DownloadDialog } from './DownloadDialog';
 import { reportService, ReportFormValues } from '../services/ReportService';
 import { checkIsJsonService } from '../services/CheckIsJsonService';
 import { storageService } from '../services/StorageService';
+import { fileService } from '../services/FileService';
 
 interface ReportFormProps {
   loading: (state: boolean) => void;
@@ -19,59 +21,66 @@ export interface ReportFormHandle {
 }
 
 const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
-  ({ loading, scanValue, cancel, qrScanValue, onNotification }, ref) => {
-    const [reportKeyVisible, setReportKeyVisible] = useState(false);
-    const [progress, setProgress] = useState<number | null>(null);
+  ({ loading, scanValue, cancel, onNotification }, ref) => {
+    const theme = useTheme();
+    const [isPasswordShow, setIsPasswordShow] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
     const [dialogVisible, setDialogVisible] = useState(false);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-    const [downloadError, setDownloadError] = useState<string | null>(null);
+    const [localFilePath, setLocalFilePath] = useState<string | null>(null);
 
     const {
-      register,
+      control,
       handleSubmit,
-      reset,
-      watch,
       setValue,
+      watch,
       formState: { errors, isValid },
     } = useForm<ReportFormValues>({
       mode: 'onChange',
       defaultValues: {
-        AccesionNumber: storageService.getAccessionNumber() || '',
+        AccesionNumber: '',
         Key: '',
       },
     });
 
-    // Handle cancel triggered from parent
+    // Load persisted accession number on mount
+    useEffect(() => {
+      async function loadSaved() {
+        const saved = await storageService.getAccessionNumber();
+        if (saved) {
+          setValue('AccesionNumber', saved, { shouldValidate: true });
+        }
+      }
+      loadSaved();
+    }, [setValue]);
+
+    // Handle cancel from parent
     useEffect(() => {
       if (cancel) {
-        cancelDownload();
+        hideDialog();
       }
     }, [cancel]);
 
-    // Handle QR Scan parsed values
+    // Parse scanned QR value
     useEffect(() => {
       if (!scanValue) return;
 
       if (checkIsJsonService.isJson(scanValue)) {
         try {
           const parsed = typeof scanValue === 'string' ? JSON.parse(scanValue) : scanValue;
-          setValue('AccesionNumber', parsed.AccesionNumber || parsed.accessionNumber || '', {
-            shouldValidate: true,
-          });
-          setValue('Key', parsed.Key || parsed.key || '', { shouldValidate: true });
+          const acc = parsed.AccesionNumber || parsed.accessionNumber || '';
+          const key = parsed.Key || parsed.key || '';
+          if (acc) setValue('AccesionNumber', acc, { shouldValidate: true });
+          if (key) setValue('Key', key, { shouldValidate: true });
         } catch {
           setValue('Key', scanValue, { shouldValidate: true });
         }
       } else {
-        const savedAcc = storageService.getAccessionNumber();
-        if (savedAcc) {
-          setValue('AccesionNumber', savedAcc, { shouldValidate: true });
-        }
         setValue('Key', scanValue, { shouldValidate: true });
       }
     }, [scanValue, setValue]);
 
-    // Persist accession number changes
+    // Save accession number when changed
     useEffect(() => {
       const subscription = watch((value) => {
         if (value.AccesionNumber) {
@@ -81,34 +90,25 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
       return () => subscription.unsubscribe();
     }, [watch]);
 
-    const showDialog = () => {
-      setProgress(0);
-      setDownloadError(null);
-      setDialogVisible(true);
-    };
-
     const hideDialog = () => {
       setDialogVisible(false);
-      setProgress(null);
-      setDownloadError(null);
-    };
-
-    const cancelDownload = () => {
-      hideDialog();
-      setPdfUrl(null);
+      setDownloadProgress(null);
     };
 
     const openReport = () => {
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      const target = localFilePath || pdfUrl;
+      if (target) {
+        if (Platform.OS === 'web') {
+          window.open(target, '_blank', 'noopener,noreferrer');
+        } else {
+          fileService.downloadAndOpenReport(target);
+        }
       }
       hideDialog();
     };
 
     useImperativeHandle(ref, () => ({
-      openReport: () => {
-        openReport();
-      },
+      openReport,
     }));
 
     const onSubmit = async (data: ReportFormValues) => {
@@ -117,186 +117,265 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
         const url = await reportService.getReportUrl(data);
         setPdfUrl(url);
         if (onNotification) {
-          onNotification('success', 'Report Found', 'Patient report URL successfully retrieved.');
+          onNotification('success', 'Report Found', 'Patient report URL retrieved successfully.');
         }
       } catch (err: any) {
-        const errMsg = err?.message || 'Error getting report';
+        const message = err?.message || 'Error getting report';
         if (onNotification) {
-          onNotification('error', 'Error getting report', errMsg);
+          onNotification('error', 'Error getting report', message);
+        } else {
+          Alert.alert('Error getting report', message);
         }
       } finally {
         loading(false);
       }
     };
 
-    const handleDownload = (urlToDownload: string) => {
-      showDialog();
+    const handleDownload = async () => {
+      if (!pdfUrl) return;
 
-      // Simulate network download progress for responsive UX before open
-      let currentProgress = 0;
-      const interval = setInterval(() => {
-        currentProgress += 20;
-        setProgress(Math.min(currentProgress, 95));
+      setDownloadProgress(10);
+      setDialogVisible(true);
 
-        if (currentProgress >= 100) {
-          clearInterval(interval);
-          setProgress(100);
-          if (onNotification) {
-            onNotification('success', 'Download Complete', 'Report is ready to open or download.');
-          }
+      try {
+        const savedPath = await fileService.downloadAndOpenReport(pdfUrl, (progress) => {
+          setDownloadProgress(progress);
+        });
+        setLocalFilePath(savedPath);
+        setDownloadProgress(100);
+      } catch (err: any) {
+        hideDialog();
+        const msg = err?.message || 'Failed to download report.';
+        if (onNotification) {
+          onNotification('error', 'Download Error', msg);
+        } else {
+          Alert.alert('Download Error', msg);
         }
-      }, 150);
+      }
     };
 
-    // Quick demo action so user can test the workflow immediately
-    const loadSampleReport = () => {
+    const loadSampleData = () => {
       setValue('AccesionNumber', 'PGX-2024-8841', { shouldValidate: true });
       setValue('Key', 'DEMO-SECURE-KEY-99', { shouldValidate: true });
       setPdfUrl('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf');
       if (onNotification) {
-        onNotification('success', 'Sample Data Loaded', 'Ready to test Search and Download flow.');
+        onNotification('success', 'Sample Credentials', 'Filled sample accession and report key.');
       }
     };
 
     return (
-      <div id="report-form-container" className="w-full max-w-md mx-auto">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Accession Number Field */}
-          <div>
-            <label
-              htmlFor="accession-number-input"
-              className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
-            >
-              Accession Number
-            </label>
-            <div className="relative">
-              <input
-                id="accession-number-input"
-                type="text"
-                placeholder="e.g. PGX-00123"
-                {...register('AccesionNumber', {
-                  required: 'Accession number is required!',
-                })}
-                className={`w-full px-4 py-3 bg-white border ${
-                  errors.AccesionNumber ? 'border-red-500' : 'border-slate-300'
-                } rounded-xl text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#002E62] focus:border-transparent transition shadow-xs`}
+      <View style={styles.container}>
+        {/* Accession Number Input */}
+        <View style={styles.inputContainer}>
+          <Controller
+            control={control}
+            name="AccesionNumber"
+            rules={{ required: 'Accession number is required!' }}
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                mode="outlined"
+                label="Accession number"
+                textColor={theme.colors.onSurface}
+                activeOutlineColor={theme.colors.primary}
+                outlineColor={errors.AccesionNumber ? theme.colors.error : theme.colors.outline}
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+                style={[
+                  styles.input,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
               />
-            </div>
-            {errors.AccesionNumber && (
-              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {errors.AccesionNumber.message}
-              </p>
             )}
-          </div>
-
-          {/* Report Key Field */}
-          <div>
-            <label
-              htmlFor="report-key-input"
-              className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
-            >
-              Report Key
-            </label>
-            <div className="relative">
-              <input
-                id="report-key-input"
-                type={reportKeyVisible ? 'text' : 'password'}
-                placeholder="Enter report security key"
-                {...register('Key', {
-                  required: 'Report key is required!',
-                })}
-                className={`w-full px-4 py-3 pr-11 bg-white border ${
-                  errors.Key ? 'border-red-500' : 'border-slate-300'
-                } rounded-xl text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#002E62] focus:border-transparent transition shadow-xs`}
-              />
-              <button
-                id="toggle-report-key-visibility-btn"
-                type="button"
-                onClick={() => setReportKeyVisible(!reportKeyVisible)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition"
-                aria-label={reportKeyVisible ? 'Hide report key' : 'Show report key'}
-              >
-                {reportKeyVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-            {errors.Key && (
-              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {errors.Key.message}
-              </p>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="pt-2 space-y-3">
-            <button
-              id="search-report-btn"
-              type="submit"
-              disabled={!isValid}
-              className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition shadow-xs ${
-                isValid
-                  ? 'bg-[#002E62] hover:bg-[#00224a] text-white cursor-pointer active:scale-[0.99]'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-              Search
-            </button>
-
-            <button
-              id="download-report-btn"
-              type="button"
-              disabled={!pdfUrl || !isValid}
-              onClick={() => pdfUrl && handleDownload(pdfUrl)}
-              className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition shadow-xs ${
-                pdfUrl && isValid
-                  ? 'bg-[#3C8DBC] hover:bg-[#347ca5] text-white cursor-pointer active:scale-[0.99]'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <Download className="w-4 h-4" />
-              Download
-            </button>
-          </div>
-
-          {/* Report Ready Info Banner */}
-          {pdfUrl && (
-            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2.5">
-              <CheckCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <div className="text-xs text-blue-900">
-                <span className="font-semibold block">Report ready for download!</span>
-                <p className="text-slate-600 mt-0.5 break-all line-clamp-1">{pdfUrl}</p>
-              </div>
-            </div>
+          />
+          {errors.AccesionNumber && (
+            <HelperText type="error" visible={true} style={styles.errorText}>
+              {errors.AccesionNumber.message}
+            </HelperText>
           )}
+        </View>
 
-          {/* Quick Demo Helper */}
-          <div className="pt-4 border-t border-slate-200 flex justify-center">
-            <button
-              id="demo-test-fill-btn"
-              type="button"
-              onClick={loadSampleReport}
-              className="text-xs text-slate-500 hover:text-[#002E62] hover:underline flex items-center gap-1 transition"
+        {/* Report Key Input */}
+        <View style={styles.inputContainer}>
+          <Controller
+            control={control}
+            name="Key"
+            rules={{ required: 'Report key is required!' }}
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                mode="outlined"
+                label="Report key"
+                textColor={theme.colors.onSurface}
+                activeOutlineColor={theme.colors.primary}
+                outlineColor={errors.Key ? theme.colors.error : theme.colors.outline}
+                secureTextEntry={!isPasswordShow}
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+                style={[
+                  styles.input,
+                  { backgroundColor: theme.colors.surfaceVariant },
+                ]}
+                right={
+                  <TextInput.Icon
+                    icon={isPasswordShow ? 'eye-off' : 'eye'}
+                    color={theme.colors.onSurfaceVariant}
+                    onPress={() => setIsPasswordShow(!isPasswordShow)}
+                  />
+                }
+              />
+            )}
+          />
+          {errors.Key && (
+            <HelperText type="error" visible={true} style={styles.errorText}>
+              {errors.Key.message}
+            </HelperText>
+          )}
+        </View>
+
+        {/* Buttons */}
+        <View style={styles.buttonsContainer}>
+          <Button
+            mode="contained"
+            buttonColor={theme.colors.primary}
+            textColor={theme.colors.onPrimary}
+            disabled={!isValid}
+            onPress={handleSubmit(onSubmit)}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+          >
+            Search
+          </Button>
+
+          <Button
+            mode="contained"
+            buttonColor={theme.colors.secondary}
+            textColor={theme.colors.onSecondary}
+            disabled={!pdfUrl || !isValid}
+            onPress={handleDownload}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+          >
+            Download
+          </Button>
+        </View>
+
+        {/* Status banner when report found */}
+        {pdfUrl && (
+          <View
+            style={[
+              styles.readyBanner,
+              {
+                backgroundColor: theme.dark ? '#0c4a6e' : '#eff6ff',
+                borderColor: theme.dark ? '#0284c7' : '#bfdbfe',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.readyTitle,
+                { color: theme.dark ? '#bae6fd' : '#1e40af' },
+              ]}
             >
-              <FileText className="w-3.5 h-3.5" />
-              Fill sample test credentials
-            </button>
-          </div>
-        </form>
+              Report ready for download!
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.readyUrl,
+                { color: theme.dark ? '#7dd3fc' : '#64748b' },
+              ]}
+            >
+              {pdfUrl}
+            </Text>
+          </View>
+        )}
 
-        {/* Download Modal Dialog */}
+        {/* Demo Helper */}
+        <TouchableOpacity onPress={loadSampleData} style={styles.demoLink}>
+          <Text
+            style={[
+              styles.demoLinkText,
+              { color: theme.colors.primary },
+            ]}
+          >
+            Fill sample test credentials
+          </Text>
+        </TouchableOpacity>
+
+        {/* Download Dialog */}
         <DownloadDialog
           show={dialogVisible}
-          downloadProgress={progress}
-          onCancel={cancelDownload}
-          onOpen={openReport}
+          cancel={hideDialog}
+          open={openReport}
+          downloadProgress={downloadProgress}
+          title={
+            downloadProgress !== null && downloadProgress >= 100
+              ? 'Successfully downloaded!'
+              : 'Downloading report...'
+          }
           reportUrl={pdfUrl}
-          errorMessage={downloadError}
         />
-      </div>
+      </View>
     );
   }
 );
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    paddingVertical: 8,
+  },
+  inputContainer: {
+    marginBottom: 10,
+  },
+  input: {
+    backgroundColor: '#ffffff',
+    fontSize: 15,
+  },
+  errorText: {
+    paddingHorizontal: 4,
+    color: '#dc2626',
+  },
+  buttonsContainer: {
+    marginTop: 8,
+    gap: 12,
+  },
+  button: {
+    borderRadius: 12,
+    marginVertical: 4,
+  },
+  buttonContent: {
+    paddingVertical: 6,
+  },
+  readyBanner: {
+    marginTop: 14,
+    padding: 12,
+    backgroundColor: '#eff6ff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  readyTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1e40af',
+  },
+  readyUrl: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  demoLink: {
+    marginTop: 18,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  demoLinkText: {
+    fontSize: 12,
+    color: '#002E62',
+    textDecorationLine: 'underline',
+  },
+});
 
 export default ReportForm;

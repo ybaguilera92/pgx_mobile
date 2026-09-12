@@ -1,147 +1,140 @@
 import React from 'react';
-import { X, ExternalLink, Download, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { StyleSheet, View, Text } from 'react-native';
+import { Button, Dialog, Portal, ProgressBar, useTheme } from 'react-native-paper';
 
 interface DownloadDialogProps {
   show: boolean;
-  onCancel: () => void;
-  onOpen: () => void;
+  cancel: () => void;
+  open: () => void;
   downloadProgress: number | null;
-  reportUrl: string | null;
-  errorMessage?: string | null;
+  title: string;
+  reportUrl?: string | null;
 }
 
 export const DownloadDialog: React.FC<DownloadDialogProps> = ({
   show,
-  onCancel,
-  onOpen,
+  cancel,
+  open,
   downloadProgress,
-  reportUrl,
-  errorMessage,
+  title,
 }) => {
-  if (!show) return null;
-
+  const theme = useTheme();
+  const numericProgress = downloadProgress !== null ? downloadProgress / 100 : 0;
   const isComplete = downloadProgress !== null && downloadProgress >= 100;
 
-  const getTitle = () => {
-    if (errorMessage) return 'Download Error';
-    if (downloadProgress === null) return 'Preparing to download';
-    if (downloadProgress < 100) return 'Downloading report';
-    return 'Successfully downloaded!';
-  };
-
-  const handleDownloadFile = () => {
-    if (!reportUrl) return;
-    const a = document.createElement('a');
-    a.href = reportUrl;
-    a.target = '_blank';
-    a.download = `PGx-Report-${Date.now() % 1000000}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
   return (
-    <div
-      id="download-dialog-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-fadeIn"
-    >
-      <div
-        id="download-dialog-card"
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all border border-slate-100"
+    <Portal>
+      <Dialog
+        visible={show}
+        onDismiss={cancel}
+        style={[
+          styles.dialog,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.outlineVariant,
+            borderWidth: theme.dark ? 1 : 0,
+          },
+        ]}
       >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            {isComplete ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            ) : errorMessage ? (
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            ) : (
-              <FileText className="w-5 h-5 text-[#002E62]" />
+        <Dialog.Title style={[styles.title, { color: theme.colors.onSurface }]}>
+          {title}
+        </Dialog.Title>
+        <Dialog.Content>
+          <View style={styles.progressContainer}>
+            <ProgressBar
+              progress={Math.max(0.05, numericProgress)}
+              color={theme.colors.primary}
+              style={[
+                styles.progressBar,
+                { backgroundColor: theme.colors.surfaceVariant },
+              ]}
+            />
+            <Text
+              style={[
+                styles.progressText,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
+              {downloadProgress !== null ? `${Math.round(downloadProgress)}%` : 'Connecting...'}
+            </Text>
+            {isComplete && (
+              <Text
+                style={[
+                  styles.completeSubtext,
+                  { color: theme.dark ? '#86efac' : '#15803d' },
+                ]}
+              >
+                Report downloaded successfully. Tap Open to view your document.
+              </Text>
             )}
-            <h3 id="dialog-title" className="text-lg font-semibold text-slate-900">
-              {getTitle()}
-            </h3>
-          </div>
-          <button
-            id="close-dialog-btn"
-            onClick={onCancel}
-            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="py-5">
-          {errorMessage ? (
-            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
-              {errorMessage}
-            </p>
-          ) : !isComplete ? (
-            <div className="space-y-3">
-              <div className="flex justify-between text-xs font-medium text-slate-500">
-                <span>Status: In progress</span>
-                <span>{downloadProgress !== null ? `${downloadProgress}%` : 'Connecting...'}</span>
-              </div>
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#002E62] transition-all duration-300 rounded-full"
-                  style={{ width: `${Math.max(5, downloadProgress ?? 15)}%` }}
-                />
-              </div>
-              <p className="text-xs text-slate-400 text-center pt-1">
-                Fetching patient pharmacogenomics document...
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm text-emerald-800 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <div className="break-all text-xs">
-                  <span className="font-semibold block mb-0.5">Report Ready:</span>
-                  <span className="text-slate-600 font-mono text-[11px] line-clamp-2">
-                    {reportUrl}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          <button
-            id="dialog-cancel-btn"
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
-          >
+          </View>
+        </Dialog.Content>
+        <Dialog.Actions style={styles.actions}>
+          <Button onPress={cancel} textColor={theme.colors.onSurfaceVariant}>
             Close
-          </button>
-
+          </Button>
           {isComplete && (
-            <>
-              <button
-                id="dialog-download-btn"
-                type="button"
-                onClick={handleDownloadFile}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#002E62] bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-              <button
-                id="dialog-open-btn"
-                type="button"
-                onClick={onOpen}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#002E62] hover:bg-[#00224a] rounded-xl shadow-xs transition"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Open Report
-              </button>
-            </>
+            <Button
+              mode="contained"
+              onPress={open}
+              buttonColor={theme.colors.primary}
+              textColor={theme.colors.onPrimary}
+              style={styles.openBtn}
+            >
+              Open Report
+            </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
   );
 };
+
+const styles = StyleSheet.create({
+  dialog: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    maxWidth: 420,
+    width: '90%',
+    alignSelf: 'center',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#002E62',
+    textAlign: 'center',
+    paddingTop: 8,
+  },
+  progressContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  progressBar: {
+    width: '100%',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 12,
+  },
+  progressText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#002E62',
+    marginTop: 4,
+  },
+  completeSubtext: {
+    fontSize: 12,
+    color: '#16a34a',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  actions: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    justifyContent: 'flex-end',
+  },
+  openBtn: {
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+});
