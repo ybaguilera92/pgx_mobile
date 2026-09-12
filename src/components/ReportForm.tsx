@@ -154,15 +154,6 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
       }
     };
 
-    const loadSampleData = () => {
-      setValue('AccesionNumber', 'PGX-2024-8841', { shouldValidate: true });
-      setValue('Key', 'DEMO-SECURE-KEY-99', { shouldValidate: true });
-      setPdfUrl('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf');
-      if (onNotification) {
-        onNotification('success', 'Sample Credentials', 'Filled sample accession and report key.');
-      }
-    };
-
     return (
       <View style={styles.container}>
         {/* Accession Number Input */}
@@ -291,18 +282,6 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
           </View>
         )}
 
-        {/* Demo Helper */}
-        <TouchableOpacity onPress={loadSampleData} style={styles.demoLink}>
-          <Text
-            style={[
-              styles.demoLinkText,
-              { color: theme.colors.primary },
-            ]}
-          >
-            Fill sample test credentials
-          </Text>
-        </TouchableOpacity>
-
         {/* Download Dialog */}
         <DownloadDialog
           show={dialogVisible}
@@ -365,16 +344,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     marginTop: 2,
-  },
-  demoLink: {
-    marginTop: 18,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  demoLinkText: {
-    fontSize: 12,
-    color: '#002E62',
-    textDecorationLine: 'underline',
   },
 });
 

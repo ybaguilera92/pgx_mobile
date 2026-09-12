@@ -1,22 +1,5 @@
 import React from 'react';
-import {
-  QrCode,
-  Eye,
-  EyeOff,
-  X,
-  Moon,
-  Sun,
-  Camera,
-  FileText,
-  Download,
-  AlertCircle,
-  CheckCircle2,
-  RefreshCw,
-  Search,
-  Upload,
-  Keyboard,
-  ShieldCheck,
-} from 'lucide-react';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export interface AppIconProps {
   name: string;
@@ -28,8 +11,9 @@ export interface AppIconProps {
 }
 
 /**
- * Universal icon component that renders smoothly on Web and Mobile,
- * using crisp SVG icons and preventing missing font or JSX build errors.
+ * Native mobile icon component powered by Expo MaterialCommunityIcons glyphs.
+ * Used by Metro bundler on Android / iOS devices.
+ * Uses font glyphs exclusively — ZERO web DOM tags like svg/circle.
  */
 export const AppIcon: React.FC<AppIconProps> = ({
   name,
@@ -37,61 +21,60 @@ export const AppIcon: React.FC<AppIconProps> = ({
   size = 24,
   style,
 }) => {
-  const iconProps = { color, size, style };
+  if (!name || typeof name !== 'string') {
+    return null;
+  }
+
+  // Map any aliases or normalize icon names for MaterialCommunityIcons
+  let iconName = name;
 
   switch (name) {
-    case 'qrcode-scan':
-    case 'qrcode':
     case 'qr-code':
-      return <QrCode {...iconProps} />;
-    case 'eye':
-      return <Eye {...iconProps} />;
-    case 'eye-off':
-      return <EyeOff {...iconProps} />;
-    case 'close':
+      iconName = 'qrcode-scan';
+      break;
     case 'cross':
     case 'x':
-      return <X {...iconProps} />;
-    case 'weather-night':
+      iconName = 'close';
+      break;
     case 'moon':
-      return <Moon {...iconProps} />;
-    case 'white-balance-sunny':
+      iconName = 'weather-night';
+      break;
     case 'sun':
-      return <Sun {...iconProps} />;
-    case 'camera':
-    case 'camera-reverse':
-    case 'camera-switch':
-      return <Camera {...iconProps} />;
-    case 'file-document-outline':
-    case 'file-pdf-box':
+      iconName = 'white-balance-sunny';
+      break;
     case 'file-text':
-      return <FileText {...iconProps} />;
-    case 'download':
-      return <Download {...iconProps} />;
-    case 'alert-circle':
-    case 'alert':
-      return <AlertCircle {...iconProps} />;
-    case 'check-circle':
+      iconName = 'file-document-outline';
+      break;
     case 'check':
-      return <CheckCircle2 {...iconProps} />;
-    case 'refresh':
-    case 'refresh-cw':
-      return <RefreshCw {...iconProps} />;
-    case 'magnify':
+      iconName = 'check-circle';
+      break;
     case 'search':
-      return <Search {...iconProps} />;
-    case 'upload':
+      iconName = 'magnify';
+      break;
+    case 'refresh-cw':
+      iconName = 'refresh';
+      break;
     case 'file-upload':
-      return <Upload {...iconProps} />;
-    case 'keyboard':
-    case 'keyboard-outline':
-      return <Keyboard {...iconProps} />;
-    case 'shield-check':
+      iconName = 'upload';
+      break;
     case 'shield':
-      return <ShieldCheck {...iconProps} />;
+      iconName = 'shield-check';
+      break;
+    case 'flash-on':
+      iconName = 'flash';
+      break;
     default:
-      return <Search {...iconProps} />;
+      iconName = name;
   }
+
+  return (
+    <MaterialCommunityIcons
+      name={iconName as any}
+      size={size}
+      color={color}
+      style={style}
+    />
+  );
 };
 
 export default AppIcon;
