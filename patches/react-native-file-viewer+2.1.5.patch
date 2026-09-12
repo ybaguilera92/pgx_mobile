@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-file-viewer/android/build.gradle b/node_modules/react-native-file-viewer/android/build.gradle
+index 5016f0c..3ec2c1c 100644
+--- a/node_modules/react-native-file-viewer/android/build.gradle
++++ b/node_modules/react-native-file-viewer/android/build.gradle
+@@ -8,6 +8,8 @@ android {
+     compileSdkVersion safeExtGet('compileSdkVersion', 28)
+     buildToolsVersion safeExtGet('buildToolsVersion', '28.0.3')
+     
++    namespace "com.vinzscam.reactnativefileviewer"
++
+     defaultConfig {
+         minSdkVersion safeExtGet('minSdkVersion', 16)
+         targetSdkVersion safeExtGet('targetSdkVersion', 28)

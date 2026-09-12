@@ -1,0 +1,19 @@
+// Fix for Windows long path issues with CMake
+// Use a shorter build directory path
+gradle.projectsLoaded {
+    rootProject.buildDir = new File(rootProject.projectDir, "build")
+    
+    allprojects { project ->
+        project.afterEvaluate {
+            if (project.hasProperty('android')) {
+                android {
+                    // Set shorter build directory for CMake
+                    if (project.name == 'react-native-reanimated') {
+                        def shortBuildDir = "C:/rn-build/${project.name}"
+                        buildDir = shortBuildDir
+                    }
+                }
+            }
+        }
+    }
+}

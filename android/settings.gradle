@@ -1,0 +1,50 @@
+pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+
+plugins { id("com.facebook.react.settings") }
+
+// Deshabilitar autolinking automático para evitar errores de compilación
+// extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+
+rootProject.name = 'PGxReports'
+
+include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// Incluir módulos manualmente
+include ':react-native-fs'
+project(':react-native-fs').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-fs/android')
+
+include ':react-native-vision-camera'
+project(':react-native-vision-camera').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-vision-camera/android')
+
+include ':react-native-hole-view'
+project(':react-native-hole-view').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-hole-view/android')
+
+include ':react-native-reanimated'
+project(':react-native-reanimated').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-reanimated/android')
+
+include ':react-native-safe-area-context'
+project(':react-native-safe-area-context').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-safe-area-context/android')
+
+include ':react-native-vector-icons'
+project(':react-native-vector-icons').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-vector-icons/android')
+
+include ':react-native-push-notification'
+project(':react-native-push-notification').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-push-notification/android')
+
+include ':react-native-permissions'
+project(':react-native-permissions').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-permissions/android')
+
+include ':react-native-file-viewer'
+project(':react-native-file-viewer').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-file-viewer/android')
+
+include ':react-native-qrcode-local-image'
+project(':react-native-qrcode-local-image').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-qrcode-local-image/android')
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        mavenCentral()
+        google()
+    }
+}

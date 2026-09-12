@@ -1,0 +1,29 @@
+ Pasos para alojar tu Política de Privacidad en GitHub Pages
+1. Crea un repositorio en GitHub
+Ve a github.com y haz clic en "New repository".
+
+Ponle un nombre como "privacidad-app" (o similar).
+
+Elige "Public" (gratis) y marca "Add a README file".
+
+Haz clic en "Create repository".
+
+2. Sube tu archivo de política de privacidad
+Crea un archivo llamado politica-privacidad.html (o politica.md si prefieres Markdown).
+
+Copia el texto de tu política (ejemplo en formato HTML):
+https://ybaguilera92.github.io/privacy-pgxreports/privacy_policy.html
+
+Haz clic en "Add file" > "Upload files" y arrastra tu archivo HTML o MD.
+
+3. Activa GitHub Pages
+Ve a "Settings" > "Pages" (en el menú izquierdo).
+
+En "Branch", selecciona main (o master) y la carpeta /(root).
+
+Haz clic en "Save".
+
+En unos minutos, tu política estará publicada en una URL como:
+
+text
+https://[tu-usuario].github.io/privacidad-app/politica-privacidad.html

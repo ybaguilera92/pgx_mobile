@@ -1,0 +1,34 @@
+diff --git a/node_modules/react-native-vision-camera/android/CMakeLists.txt b/node_modules/react-native-vision-camera/android/CMakeLists.txt
+index 17097c1..3fbb198 100644
+--- a/node_modules/react-native-vision-camera/android/CMakeLists.txt
++++ b/node_modules/react-native-vision-camera/android/CMakeLists.txt
+@@ -42,6 +42,15 @@ add_library(
+         src/main/cpp/frameprocessors/java-bindings/JVisionCameraScheduler.cpp
+ )
+ 
++if(ANDROID)
++    target_link_options(
++            ${PACKAGE_NAME}
++            PRIVATE
++            "-Wl,-z,max-page-size=16384"
++            "-Wl,-z,common-page-size=16384"
++    )
++endif()
++
+ # Header Search Paths (includes)
+ target_include_directories(
+         ${PACKAGE_NAME}
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt
+index 862c03a..5a31c76 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt
+@@ -90,7 +90,8 @@ class CameraSession(internal val context: Context, internal val callback: Callba
+     }
+   }
+ 
+-  override fun getLifecycle(): Lifecycle = lifecycleRegistry
++  override val lifecycle: Lifecycle
++    get() = lifecycleRegistry
+ 
+   /**
+    * Configures the [CameraSession] with new values in one batch.

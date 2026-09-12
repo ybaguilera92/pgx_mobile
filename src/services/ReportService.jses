@@ -1,0 +1,25 @@
+import {REACT_APP_API_URL, REACT_APP_API_KEY} from '@env';
+
+export const reportService = {
+  getReportUrl: async function (payload) {
+    try {
+      const response = await fetch(REACT_APP_API_URL, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'x-api-key': REACT_APP_API_KEY,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {        
+        const json = await response.json();
+        return json;
+      } else {
+        throw new Error('Network response was not ok!');
+      }
+    } catch (err) {
+      throw new Error(err);
+    }
+  },
+};
