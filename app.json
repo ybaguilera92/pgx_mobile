@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PGx Reports",
-    "slug": "pgx-reports",
+    "slug": "pgxmobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/logo-mini.png",
@@ -27,7 +27,8 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -41,6 +42,12 @@
           "cameraPermission": "Allow PGx Reports to access your camera to scan report QR codes."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "eafaf1ea-6f39-40a5-8165-49e0f3a3be48"
+      }
+    },
+    "owner": "yoel.benedico"
   }
 }
