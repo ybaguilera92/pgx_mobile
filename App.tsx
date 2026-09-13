@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QrCodeScan } from './src/components/QrCodeScan';
 import ReportForm, { ReportFormHandle } from './src/components/ReportForm';
 import { AppIcon } from './src/components/AppIcon';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import { lightTheme, darkTheme } from './src/theme';
 import { storageService } from './src/services/StorageService';
 import logoImg from './src/assets/images/logo-mini.png';
@@ -74,22 +75,27 @@ export default function App() {
   };
 
   return (
-    <PaperProvider
-      theme={currentTheme}
-      settings={{
-        icon: (props) => <AppIcon {...props} />,
-      }}
-    >
-      <SafeAreaView
-        style={[
-          styles.safeArea,
-          { backgroundColor: currentTheme.colors.background },
-        ]}
+    <ErrorBoundary fallbackTitle="Error en la aplicación">
+      <PaperProvider
+        theme={currentTheme}
+        {...(Platform.OS === 'web'
+          ? {
+              settings: {
+                icon: (props: any) => <AppIcon {...props} />,
+              },
+            }
+          : {})}
       >
-        <StatusBar
-          style={isDarkMode ? 'light' : 'dark'}
-          backgroundColor={currentTheme.colors.background}
-        />
+        <SafeAreaView
+          style={[
+            styles.safeArea,
+            { backgroundColor: qrScan ? '#000000' : currentTheme.colors.background },
+          ]}
+        >
+          <StatusBar
+            style={qrScan ? 'light' : isDarkMode ? 'light' : 'dark'}
+            backgroundColor={qrScan ? '#000000' : currentTheme.colors.background}
+          />
 
         {!qrScan ? (
           <ScrollView
@@ -296,6 +302,7 @@ export default function App() {
         )}
       </SafeAreaView>
     </PaperProvider>
+  </ErrorBoundary>
   );
 }
 

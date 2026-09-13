@@ -1,14 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
-  Platform,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
-import { IconButton } from 'react-native-paper';
-import jsQR from 'jsqr';
+import { CameraView, useCameraPermissions, BarcodeSettings } from 'expo-camera';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ErrorBoundary from './ErrorBoundary';
+
+const BARCODE_SETTINGS: BarcodeSettings = {
+  barcodeTypes: ['qr'],
+};
 
 interface QrCodeScanProps {
   onClear: (val: boolean) => void;
@@ -16,464 +21,391 @@ interface QrCodeScanProps {
   isLandscape?: boolean;
 }
 
-export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) => {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [manualMode, setManualMode] = useState(false);
+const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) => {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [mountError, setMountError] = useState<string | null>(null);
+  const [isTorchOn, setIsTorchOn] = useState(false);
+  const [scanned, setScanned] = useState(false);
 
-  // Web camera refs
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleBarcodeScanned = useCallback(
+    (data: string) => {
+      if (scanned) return;
+      setScanned(true);
+      if (data) {
+        qrScanValue(data);
+        onClear(false);
+      }
+    },
+    [scanned, qrScanValue, onClear]
+  );
 
-  const handleQrDetected = (codeText: string) => {
-    setIsProcessing(true);
-    qrScanValue(codeText);
-    stopWebCamera();
+  const handleClose = () => {
     onClear(false);
   };
 
-  const startWebCamera = async () => {
-    if (Platform.OS !== 'web') return;
-    setErrorMessage('');
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      };
+  // State 1: Permission is still loading from system
+  if (!permission) {
+    return (
+      <View style={styles.fullscreenDark}>
+        <ActivityIndicator size="large" color="#38bdf8" />
+        <Text style={styles.statusText}>Comprobando permisos de cámara...</Text>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={handleClose}>
+          <Text style={styles.secondaryBtnText}>Cancelar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      setHasPermission(true);
+  // State 2: Permission not granted yet or denied
+  if (!permission.granted) {
+    return (
+      <View style={styles.fullscreenDark}>
+        <View style={styles.card}>
+          <View style={styles.iconCircle}>
+            <MaterialCommunityIcons name="camera-outline" size={36} color="#38bdf8" />
+          </View>
+          <Text style={styles.title}>Permiso de Cámara Requerido</Text>
+          <Text style={styles.subtitle}>
+            Para escanear el código QR de su reporte PGx, la aplicación necesita acceso a la cámara de su dispositivo.
+          </Text>
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', 'true');
-        await videoRef.current.play();
-        requestAnimationFrame(scanTick);
-      }
-    } catch (err: any) {
-      console.warn('Camera error:', err);
-      setHasPermission(false);
-      setErrorMessage('Could not open camera. You can upload an image of your QR code below.');
-      setManualMode(true);
-    }
-  };
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={async () => {
+              try {
+                await requestPermission();
+              } catch (err: any) {
+                setMountError(err?.message || 'Error solicitando permiso');
+              }
+            }}
+          >
+            <Text style={styles.primaryBtnText}>Permitir Acceso a la Cámara</Text>
+          </TouchableOpacity>
 
-  const stopWebCamera = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  };
+          <TouchableOpacity style={styles.textBtn} onPress={handleClose}>
+            <Text style={styles.textBtnText}>Ingresar código manualmente</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
-  const scanTick = () => {
-    if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-      animationFrameRef.current = requestAnimationFrame(scanTick);
-      return;
-    }
+  // State 3: Mount error on hardware / CameraX initialization
+  if (mountError) {
+    return (
+      <View style={styles.fullscreenDark}>
+        <View style={styles.card}>
+          <View style={[styles.iconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+            <MaterialCommunityIcons name="camera-off" size={36} color="#ef4444" />
+          </View>
+          <Text style={styles.title}>No se pudo iniciar la cámara</Text>
+          <Text style={styles.subtitle}>{mountError}</Text>
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => {
+              setMountError(null);
+              setIsCameraReady(false);
+            }}
+          >
+            <Text style={styles.primaryBtnText}>Reintentar</Text>
+          </TouchableOpacity>
 
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
+          <TouchableOpacity style={styles.textBtn} onPress={handleClose}>
+            <Text style={styles.textBtnText}>Ingresar código manualmente</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth',
-    });
-
-    if (code && code.data) {
-      handleQrDetected(code.data);
-      return;
-    }
-
-    animationFrameRef.current = requestAnimationFrame(scanTick);
-  };
-
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      startWebCamera();
-    }
-    return () => {
-      stopWebCamera();
-    };
-  }, []);
-
-  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsProcessing(true);
-    setErrorMessage('');
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          setIsProcessing(false);
-          setErrorMessage('Failed to create decoding canvas.');
-          return;
-        }
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'attemptBoth',
-        });
-
-        if (code && code.data) {
-          handleQrDetected(code.data);
-        } else {
-          setIsProcessing(false);
-          setErrorMessage('No QR code found in this image. Please try another image.');
-        }
-      };
-      img.onerror = () => {
-        setIsProcessing(false);
-        setErrorMessage('Failed to read image file.');
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
-
+  // State 4: Camera active
   return (
     <View style={styles.container}>
-      {/* Header bar */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Scan PGx QR Code</Text>
-        <IconButton
-          icon="close"
-          iconColor="#ffffff"
-          size={24}
-          onPress={() => {
-            stopWebCamera();
-            onClear(false);
-          }}
-        />
-      </View>
+      {/* Native Camera View filling screen */}
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        enableTorch={isTorchOn}
+        barcodeScannerSettings={BARCODE_SETTINGS}
+        onCameraReady={() => setIsCameraReady(true)}
+        onMountError={(err) => {
+          console.warn('Camera onMountError:', err);
+          setMountError(err?.message || 'No se pudo iniciar la vista de cámara.');
+        }}
+        onBarcodeScanned={
+          scanned
+            ? undefined
+            : ({ data }) => {
+                handleBarcodeScanned(data);
+              }
+        }
+      />
 
-      {/* Main Viewport */}
-      <View style={styles.scannerArea}>
-        {Platform.OS === 'web' && (
-          <>
-            <video
-              ref={videoRef}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: manualMode ? 'none' : 'block',
-              }}
-              muted
+      {/* Top Controls Overlay */}
+      <View style={styles.topBar}>
+        <Text style={styles.topBarTitle}>Escanear Código QR PGx</Text>
+        <View style={styles.topBarButtons}>
+          <TouchableOpacity
+            style={[styles.iconButton, isTorchOn && styles.iconButtonActive]}
+            onPress={() => setIsTorchOn(!isTorchOn)}
+            accessibilityLabel="Activar o desactivar linterna"
+          >
+            <MaterialCommunityIcons
+              name={isTorchOn ? 'flash' : 'flash-off'}
+              size={22}
+              color="#ffffff"
             />
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-          </>
-        )}
+          </TouchableOpacity>
 
-        {/* Viewfinder Target */}
-        {!manualMode && (
-          <View style={styles.targetContainer}>
-            <View style={styles.targetBox}>
-              <View style={[styles.corner, styles.topLeft]} />
-              <View style={[styles.corner, styles.topRight]} />
-              <View style={[styles.corner, styles.bottomLeft]} />
-              <View style={[styles.corner, styles.bottomRight]} />
-              <View style={styles.laserLine} />
-            </View>
-            <Text style={styles.instructionText}>Align the QR code within the frame</Text>
-          </View>
-        )}
-
-        {/* Manual Image Upload Mode */}
-        {manualMode && (
-          <View style={styles.manualContainer}>
-            <Text style={styles.manualTitle}>Upload QR Code Image</Text>
-            <Text style={styles.manualSubtitle}>
-              Select an image containing your PGx report QR code to scan it.
-            </Text>
-
-            {Platform.OS === 'web' && (
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageFile}
-                style={{ display: 'none' }}
-              />
-            )}
-
-            <TouchableOpacity
-              style={styles.uploadButton}
-              onPress={() => {
-                if (Platform.OS === 'web' && fileInputRef.current) {
-                  fileInputRef.current.click();
-                }
-              }}
-            >
-              <Text style={styles.uploadButtonText}>Choose Image</Text>
-            </TouchableOpacity>
-
-            {hasPermission === false && (
-              <TouchableOpacity onPress={startWebCamera} style={styles.retryBtn}>
-                <Text style={styles.retryText}>Retry camera access</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Error notification */}
-        {errorMessage ? (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>{errorMessage}</Text>
-          </View>
-        ) : null}
-
-        {/* Processing Spinner */}
-        {isProcessing && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#3C8DBC" />
-            <Text style={styles.loadingText}>Processing QR Code...</Text>
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={handleClose}
+            accessibilityLabel="Cerrar escáner"
+          >
+            <MaterialCommunityIcons name="close" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Footer controls */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.toggleModeBtn}
-          onPress={() => setManualMode(!manualMode)}
-        >
-          <Text style={styles.toggleModeText}>
-            {manualMode ? 'Switch to Live Camera' : 'Upload Image Instead'}
-          </Text>
-        </TouchableOpacity>
+      {/* Viewfinder Target in Center */}
+      <View style={styles.targetWrapper} pointerEvents="none">
+        <View style={styles.targetFrame}>
+          <View style={[styles.corner, styles.cornerTL]} />
+          <View style={[styles.corner, styles.cornerTR]} />
+          <View style={[styles.corner, styles.cornerBL]} />
+          <View style={[styles.corner, styles.cornerBR]} />
+          <View style={styles.laserBar} />
+        </View>
+        <Text style={styles.instructionBanner}>
+          Apunte la cámara al código QR de su reporte
+        </Text>
+      </View>
 
-        <TouchableOpacity
-          onPress={() => {
-            stopWebCamera();
-            onClear(false);
-          }}
-          style={styles.cancelBtn}
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
+      {/* Bottom Controls */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
+          <Text style={styles.cancelButtonText}>Ingresar código manualmente</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 };
 
+export const QrCodeScan: React.FC<QrCodeScanProps> = (props) => (
+  <ErrorBoundary
+    fallbackTitle="Error en el escáner de cámara"
+    onReset={() => props.onClear(false)}
+  >
+    <QrCodeScanInner {...props} />
+  </ErrorBoundary>
+);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
+    position: 'relative',
     justifyContent: 'space-between',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    zIndex: 10,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  scannerArea: {
+  fullscreenDark: {
     flex: 1,
-    position: 'relative',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#090d16',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  targetContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 5,
-  },
-  targetBox: {
-    width: 260,
-    height: 260,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  corner: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderColor: '#3C8DBC',
-  },
-  topLeft: {
-    top: -2,
-    left: -2,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 10,
-  },
-  topRight: {
-    top: -2,
-    right: -2,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 10,
-  },
-  bottomLeft: {
-    bottom: -2,
-    left: -2,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 10,
-  },
-  bottomRight: {
-    bottom: -2,
-    right: -2,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 10,
-  },
-  laserLine: {
-    position: 'absolute',
-    left: 10,
-    right: 10,
-    top: '50%',
-    height: 2,
-    backgroundColor: '#3C8DBC',
-  },
-  instructionText: {
-    color: '#f1f5f9',
-    marginTop: 20,
-    fontSize: 13,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  manualContainer: {
     padding: 24,
-    alignItems: 'center',
-    maxWidth: 380,
-    zIndex: 5,
   },
-  manualTitle: {
+  card: {
+    backgroundColor: '#131b2e',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  title: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',
   },
-  manualSubtitle: {
+  subtitle: {
     color: '#94a3b8',
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  statusText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    marginTop: 16,
     marginBottom: 20,
   },
-  uploadButton: {
-    backgroundColor: '#002E62',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(60, 141, 188, 0.4)',
-  },
-  uploadButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  retryBtn: {
-    marginTop: 16,
-  },
-  retryText: {
-    color: '#3C8DBC',
-    fontSize: 12,
-    textDecorationLine: 'underline',
-  },
-  errorBanner: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(185, 28, 28, 0.9)',
-    padding: 10,
-    borderRadius: 8,
-    zIndex: 20,
-  },
-  errorBannerText: {
-    color: '#fee2e2',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
+  primaryBtn: {
+    backgroundColor: '#0284c7',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    width: '100%',
     alignItems: 'center',
-    zIndex: 25,
+    marginBottom: 12,
   },
-  loadingText: {
+  primaryBtnText: {
     color: '#ffffff',
-    marginTop: 10,
-    fontSize: 13,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  textBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  textBtnText: {
+    color: '#38bdf8',
+    fontSize: 14,
     fontWeight: '500',
   },
-  footer: {
+  secondaryBtn: {
+    backgroundColor: '#1e293b',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  secondaryBtnText: {
+    color: '#cbd5e1',
+    fontSize: 14,
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    paddingTop: Platform.OS === 'android' ? 36 : 16,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     zIndex: 10,
   },
-  toggleModeBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
+  topBarTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  toggleModeText: {
-    color: '#3C8DBC',
-    fontSize: 12,
+  topBarButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconButtonActive: {
+    backgroundColor: '#0284c7',
+  },
+  targetWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
+  targetFrame: {
+    width: 250,
+    height: 250,
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderColor: '#38bdf8',
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 8,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 8,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 8,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 8,
+  },
+  laserBar: {
+    position: 'absolute',
+    top: '50%',
+    left: 12,
+    right: 12,
+    height: 2,
+    backgroundColor: '#ef4444',
+  },
+  instructionBanner: {
+    marginTop: 24,
+    color: '#f8fafc',
+    fontSize: 14,
     fontWeight: '500',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
-  cancelBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  bottomBar: {
+    paddingBottom: Platform.OS === 'android' ? 28 : 20,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    zIndex: 10,
   },
-  cancelText: {
-    color: '#94a3b8',
-    fontSize: 12,
+  cancelButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+  },
+  cancelButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
+
+export default QrCodeScan;
