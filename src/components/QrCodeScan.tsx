@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
-} from 'react-native';
-import { CameraView, useCameraPermissions, BarcodeSettings } from 'expo-camera';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import ErrorBoundary from './ErrorBoundary';
+} from "react-native";
+import { CameraView, useCameraPermissions, BarcodeSettings } from "expo-camera";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import ErrorBoundary from "./ErrorBoundary";
 
 const BARCODE_SETTINGS: BarcodeSettings = {
-  barcodeTypes: ['qr'],
+  barcodeTypes: ["qr"],
 };
 
 interface QrCodeScanProps {
@@ -21,7 +21,10 @@ interface QrCodeScanProps {
   isLandscape?: boolean;
 }
 
-const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) => {
+const QrCodeScanInner: React.FC<QrCodeScanProps> = ({
+  onClear,
+  qrScanValue,
+}) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [mountError, setMountError] = useState<string | null>(null);
@@ -37,7 +40,7 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
         onClear(false);
       }
     },
-    [scanned, qrScanValue, onClear]
+    [scanned, qrScanValue, onClear],
   );
 
   const handleClose = () => {
@@ -63,11 +66,16 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
       <View style={styles.fullscreenDark}>
         <View style={styles.card}>
           <View style={styles.iconCircle}>
-            <MaterialCommunityIcons name="camera-outline" size={36} color="#38bdf8" />
+            <MaterialCommunityIcons
+              name="camera-outline"
+              size={36}
+              color="#38bdf8"
+            />
           </View>
           <Text style={styles.title}>Permiso de Cámara Requerido</Text>
           <Text style={styles.subtitle}>
-            Para escanear el código QR de su reporte PGx, la aplicación necesita acceso a la cámara de su dispositivo.
+            Para escanear el código QR de su reporte PGx, la aplicación necesita
+            acceso a la cámara de su dispositivo.
           </Text>
 
           <TouchableOpacity
@@ -76,15 +84,17 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
               try {
                 await requestPermission();
               } catch (err: any) {
-                setMountError(err?.message || 'Error solicitando permiso');
+                setMountError(err?.message || "Error solicitando permiso");
               }
             }}
           >
-            <Text style={styles.primaryBtnText}>Permitir Acceso a la Cámara</Text>
+            <Text style={styles.primaryBtnText}>
+              Permitir Acceso a la Cámara
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.textBtn} onPress={handleClose}>
-            <Text style={styles.textBtnText}>Ingresar código manualmente</Text>
+            <Text style={styles.textBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -96,8 +106,17 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
     return (
       <View style={styles.fullscreenDark}>
         <View style={styles.card}>
-          <View style={[styles.iconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-            <MaterialCommunityIcons name="camera-off" size={36} color="#ef4444" />
+          <View
+            style={[
+              styles.iconCircle,
+              { backgroundColor: "rgba(239, 68, 68, 0.15)" },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="camera-off"
+              size={36}
+              color="#ef4444"
+            />
           </View>
           <Text style={styles.title}>No se pudo iniciar la cámara</Text>
           <Text style={styles.subtitle}>{mountError}</Text>
@@ -113,7 +132,7 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.textBtn} onPress={handleClose}>
-            <Text style={styles.textBtnText}>Ingresar código manualmente</Text>
+            <Text style={styles.textBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -131,8 +150,10 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
         barcodeScannerSettings={BARCODE_SETTINGS}
         onCameraReady={() => setIsCameraReady(true)}
         onMountError={(err) => {
-          console.warn('Camera onMountError:', err);
-          setMountError(err?.message || 'No se pudo iniciar la vista de cámara.');
+          console.warn("Camera onMountError:", err);
+          setMountError(
+            err?.message || "No se pudo iniciar la vista de cámara.",
+          );
         }}
         onBarcodeScanned={
           scanned
@@ -145,7 +166,7 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
 
       {/* Top Controls Overlay */}
       <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>Escanear Código QR PGx</Text>
+        <View />
         <View style={styles.topBarButtons}>
           <TouchableOpacity
             style={[styles.iconButton, isTorchOn && styles.iconButtonActive]}
@@ -153,7 +174,7 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
             accessibilityLabel="Activar o desactivar linterna"
           >
             <MaterialCommunityIcons
-              name={isTorchOn ? 'flash' : 'flash-off'}
+              name={isTorchOn ? "flash" : "flash-off"}
               size={22}
               color="#ffffff"
             />
@@ -179,15 +200,8 @@ const QrCodeScanInner: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) =>
           <View style={styles.laserBar} />
         </View>
         <Text style={styles.instructionBanner}>
-          Apunte la cámara al código QR de su reporte
+          Point the camera at the QR code
         </Text>
-      </View>
-
-      {/* Bottom Controls */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
-          <Text style={styles.cancelButtonText}>Ingresar código manualmente</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -205,140 +219,140 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = (props) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#000000',
-    position: 'relative',
-    justifyContent: 'space-between',
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000000",
+    position: "relative",
+    justifyContent: "space-between",
   },
   fullscreenDark: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#090d16',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#090d16",
+    alignItems: "center",
+    justifyContent: "center",
     padding: 24,
   },
   card: {
-    backgroundColor: '#131b2e',
+    backgroundColor: "#131b2e",
     borderRadius: 20,
     padding: 24,
-    width: '100%',
+    width: "100%",
     maxWidth: 380,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: "#1e293b",
   },
   iconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 16,
   },
   title: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
-    color: '#94a3b8',
+    color: "#94a3b8",
     fontSize: 14,
     lineHeight: 20,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 24,
   },
   statusText: {
-    color: '#94a3b8',
+    color: "#94a3b8",
     fontSize: 14,
     marginTop: 16,
     marginBottom: 20,
   },
   primaryBtn: {
-    backgroundColor: '#0284c7',
+    backgroundColor: "#0284c7",
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 10,
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
     marginBottom: 12,
   },
   primaryBtnText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   textBtn: {
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
   textBtnText: {
-    color: '#38bdf8',
+    color: "#38bdf8",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   secondaryBtn: {
-    backgroundColor: '#1e293b',
+    backgroundColor: "#1e293b",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   secondaryBtnText: {
-    color: '#cbd5e1',
+    color: "#cbd5e1",
     fontSize: 14,
   },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'android' ? 36 : 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: Platform.OS === "android" ? 36 : 16,
     paddingBottom: 12,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
     zIndex: 10,
   },
   topBarTitle: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   topBarButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   iconButtonActive: {
-    backgroundColor: '#0284c7',
+    backgroundColor: "#0284c7",
   },
   targetWrapper: {
     ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     zIndex: 5,
   },
   targetFrame: {
     width: 250,
     height: 250,
-    position: 'relative',
+    position: "relative",
   },
   corner: {
-    position: 'absolute',
+    position: "absolute",
     width: 32,
     height: 32,
-    borderColor: '#38bdf8',
+    borderColor: "#38bdf8",
   },
   cornerTL: {
     top: 0,
@@ -369,42 +383,42 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
   },
   laserBar: {
-    position: 'absolute',
-    top: '50%',
+    position: "absolute",
+    top: "50%",
     left: 12,
     right: 12,
     height: 2,
-    backgroundColor: '#ef4444',
+    backgroundColor: "#ef4444",
   },
   instructionBanner: {
     marginTop: 24,
-    color: '#f8fafc',
+    color: "#f8fafc",
     fontSize: 14,
-    fontWeight: '500',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    fontWeight: "500",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   bottomBar: {
-    paddingBottom: Platform.OS === 'android' ? 28 : 20,
+    paddingBottom: Platform.OS === "android" ? 28 : 20,
     paddingTop: 12,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    alignItems: "center",
     zIndex: 10,
   },
   cancelButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 24,
   },
   cancelButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
 
