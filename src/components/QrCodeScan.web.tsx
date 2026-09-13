@@ -1,13 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   ActivityIndicator,
-} from 'react-native';
-import { IconButton } from 'react-native-paper';
-import jsQR from 'jsqr';
+} from "react-native";
+import { IconButton } from "react-native-paper";
+import jsQR from "jsqr";
 
 interface QrCodeScanProps {
   onClear: (val: boolean) => void;
@@ -15,9 +15,12 @@ interface QrCodeScanProps {
   isLandscape?: boolean;
 }
 
-export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) => {
+export const QrCodeScan: React.FC<QrCodeScanProps> = ({
+  onClear,
+  qrScanValue,
+}) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [manualMode, setManualMode] = useState(false);
 
@@ -36,11 +39,11 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
   };
 
   const startWebCamera = async () => {
-    setErrorMessage('');
+    setErrorMessage("");
     try {
       const constraints: MediaStreamConstraints = {
         video: {
-          facingMode: { ideal: 'environment' },
+          facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -52,14 +55,16 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.setAttribute("playsinline", "true");
         await videoRef.current.play();
         requestAnimationFrame(scanTick);
       }
     } catch (err: any) {
-      console.warn('Camera error:', err);
+      console.warn("Camera error:", err);
       setHasPermission(false);
-      setErrorMessage('Could not open camera. You can upload an image of your QR code below.');
+      setErrorMessage(
+        "Could not open camera. You can upload an image of your QR code below.",
+      );
       setManualMode(true);
     }
   };
@@ -76,7 +81,10 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
   };
 
   const scanTick = () => {
-    if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
+    if (
+      !videoRef.current ||
+      videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA
+    ) {
       animationFrameRef.current = requestAnimationFrame(scanTick);
       return;
     }
@@ -85,7 +93,7 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
 
     canvas.width = video.videoWidth;
@@ -94,7 +102,7 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth',
+      inversionAttempts: "attemptBoth",
     });
 
     if (code && code.data) {
@@ -117,17 +125,17 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
     if (!file) return;
 
     setIsProcessing(true);
-    setErrorMessage('');
+    setErrorMessage("");
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
         if (!ctx) {
           setIsProcessing(false);
-          setErrorMessage('Failed to create decoding canvas.');
+          setErrorMessage("Failed to create decoding canvas.");
           return;
         }
 
@@ -137,19 +145,21 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
 
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'attemptBoth',
+          inversionAttempts: "attemptBoth",
         });
 
         if (code && code.data) {
           handleQrDetected(code.data);
         } else {
           setIsProcessing(false);
-          setErrorMessage('No QR code found in this image. Please try another image.');
+          setErrorMessage(
+            "No QR code found in this image. Please try another image.",
+          );
         }
       };
       img.onerror = () => {
         setIsProcessing(false);
-        setErrorMessage('Failed to read image file.');
+        setErrorMessage("Failed to read image file.");
       };
       img.src = event.target?.result as string;
     };
@@ -160,7 +170,7 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
     <View style={styles.container}>
       {/* Header bar */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Scan PGx QR Code</Text>
+        <View />
         <IconButton
           icon="close"
           iconColor="#ffffff"
@@ -177,15 +187,15 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
         <video
           ref={videoRef}
           style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: manualMode ? 'none' : 'block',
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: manualMode ? "none" : "block",
           }}
           muted
         />
-        <canvas ref={canvasRef} style={{ display: 'none' }} />
+        <canvas ref={canvasRef} style={{ display: "none" }} />
 
         {/* Viewfinder Target */}
         {!manualMode && (
@@ -197,7 +207,9 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
               <View style={[styles.corner, styles.bottomRight]} />
               <View style={styles.laserLine} />
             </View>
-            <Text style={styles.instructionText}>Align the QR code within the frame</Text>
+            <Text style={styles.instructionText}>
+              Align the QR code within the frame
+            </Text>
           </View>
         )}
 
@@ -214,7 +226,7 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
               type="file"
               accept="image/*"
               onChange={handleImageFile}
-              style={{ display: 'none' }}
+              style={{ display: "none" }}
             />
 
             <TouchableOpacity
@@ -229,7 +241,10 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
             </TouchableOpacity>
 
             {hasPermission === false && (
-              <TouchableOpacity onPress={startWebCamera} style={styles.retryBtn}>
+              <TouchableOpacity
+                onPress={startWebCamera}
+                style={styles.retryBtn}
+              >
                 <Text style={styles.retryText}>Retry camera access</Text>
               </TouchableOpacity>
             )}
@@ -259,7 +274,7 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
           onPress={() => setManualMode(!manualMode)}
         >
           <Text style={styles.toggleModeText}>
-            {manualMode ? 'Switch to Live Camera' : 'Upload Image Instead'}
+            {manualMode ? "Switch to Live Camera" : "Upload Image Instead"}
           </Text>
         </TouchableOpacity>
 
@@ -280,46 +295,46 @@ export const QrCodeScan: React.FC<QrCodeScanProps> = ({ onClear, qrScanValue }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
-    justifyContent: 'space-between',
+    backgroundColor: "#020617",
+    justifyContent: "space-between",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: "rgba(15, 23, 42, 0.95)",
     zIndex: 10,
   },
   headerTitle: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   scannerArea: {
     flex: 1,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   targetContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     zIndex: 5,
   },
   targetBox: {
     width: 250,
     height: 250,
-    position: 'relative',
-    backgroundColor: 'transparent',
+    position: "relative",
+    backgroundColor: "transparent",
   },
   corner: {
-    position: 'absolute',
+    position: "absolute",
     width: 28,
     height: 28,
-    borderColor: '#38bdf8',
+    borderColor: "#38bdf8",
   },
   topLeft: {
     top: 0,
@@ -350,33 +365,33 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 6,
   },
   laserLine: {
-    position: 'absolute',
-    top: '50%',
+    position: "absolute",
+    top: "50%",
     left: 10,
     right: 10,
     height: 2,
-    backgroundColor: '#ef4444',
-    shadowColor: '#ef4444',
+    backgroundColor: "#ef4444",
+    shadowColor: "#ef4444",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 4,
   },
   instructionText: {
-    color: '#e2e8f0',
+    color: "#e2e8f0",
     marginTop: 24,
     fontSize: 14,
-    fontWeight: '500',
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    fontWeight: "500",
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   manualContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 24,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: "rgba(15, 23, 42, 0.85)",
     borderRadius: 16,
     marginHorizontal: 24,
     maxWidth: 360,
@@ -384,30 +399,30 @@ const styles = StyleSheet.create({
   },
   manualTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontWeight: "bold",
+    color: "#ffffff",
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   manualSubtitle: {
     fontSize: 13,
-    color: '#94a3b8',
-    textAlign: 'center',
+    color: "#94a3b8",
+    textAlign: "center",
     marginBottom: 20,
     lineHeight: 18,
   },
   uploadButton: {
-    backgroundColor: '#0284c7',
+    backgroundColor: "#0284c7",
     paddingVertical: 12,
     paddingHorizontal: 28,
     borderRadius: 8,
-    alignItems: 'center',
-    width: '100%',
+    alignItems: "center",
+    width: "100%",
   },
   uploadButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   retryBtn: {
     marginTop: 14,
@@ -415,46 +430,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   retryText: {
-    color: '#38bdf8',
+    color: "#38bdf8",
     fontSize: 13,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   errorBanner: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 20,
     left: 20,
     right: 20,
-    backgroundColor: '#ef4444',
+    backgroundColor: "#ef4444",
     padding: 12,
     borderRadius: 8,
     zIndex: 10,
   },
   errorBannerText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 13,
-    textAlign: 'center',
-    fontWeight: '500',
+    textAlign: "center",
+    fontWeight: "500",
   },
   loadingOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(2, 6, 23, 0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(2, 6, 23, 0.85)",
+    alignItems: "center",
+    justifyContent: "center",
     zIndex: 20,
   },
   loadingText: {
-    color: '#ffffff',
+    color: "#ffffff",
     marginTop: 12,
     fontSize: 14,
   },
   footer: {
     padding: 16,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    alignItems: 'center',
+    backgroundColor: "rgba(15, 23, 42, 0.95)",
+    alignItems: "center",
     gap: 12,
     zIndex: 10,
   },
@@ -462,21 +477,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    width: '100%',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    width: "100%",
+    alignItems: "center",
   },
   toggleModeText: {
-    color: '#e2e8f0',
+    color: "#e2e8f0",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   cancelBtn: {
     paddingVertical: 6,
     paddingHorizontal: 20,
   },
   cancelText: {
-    color: '#94a3b8',
+    color: "#94a3b8",
     fontSize: 14,
   },
 });

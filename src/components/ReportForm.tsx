@@ -1,19 +1,35 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { StyleSheet, View, Text, Platform, Alert, TouchableOpacity } from 'react-native';
-import { TextInput, Button, HelperText, useTheme } from 'react-native-paper';
-import { useForm, Controller } from 'react-hook-form';
-import { DownloadDialog } from './DownloadDialog';
-import { reportService, ReportFormValues } from '../services/ReportService';
-import { checkIsJsonService } from '../services/CheckIsJsonService';
-import { storageService } from '../services/StorageService';
-import { fileService } from '../services/FileService';
+import React, {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  Platform,
+  Alert,
+  TouchableOpacity,
+} from "react-native";
+import { TextInput, Button, HelperText, useTheme } from "react-native-paper";
+import { useForm, Controller } from "react-hook-form";
+import { DownloadDialog } from "./DownloadDialog";
+import { reportService, ReportFormValues } from "../services/ReportService";
+import { checkIsJsonService } from "../services/CheckIsJsonService";
+import { storageService } from "../services/StorageService";
+import { fileService } from "../services/FileService";
 
 interface ReportFormProps {
   loading: (state: boolean) => void;
   scanValue: string;
   cancel: boolean;
   qrScanValue: (val: string) => void;
-  onNotification?: (type: 'success' | 'error', title: string, message: string) => void;
+  onNotification?: (
+    type: "success" | "error",
+    title: string,
+    message: string,
+  ) => void;
 }
 
 export interface ReportFormHandle {
@@ -24,7 +40,9 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
   ({ loading, scanValue, cancel, onNotification }, ref) => {
     const theme = useTheme();
     const [isPasswordShow, setIsPasswordShow] = useState(false);
-    const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+    const [downloadProgress, setDownloadProgress] = useState<number | null>(
+      null,
+    );
     const [dialogVisible, setDialogVisible] = useState(false);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [localFilePath, setLocalFilePath] = useState<string | null>(null);
@@ -36,10 +54,10 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
       watch,
       formState: { errors, isValid },
     } = useForm<ReportFormValues>({
-      mode: 'onChange',
+      mode: "onChange",
       defaultValues: {
-        AccesionNumber: '',
-        Key: '',
+        AccesionNumber: "",
+        Key: "",
       },
     });
 
@@ -48,7 +66,7 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
       async function loadSaved() {
         const saved = await storageService.getAccessionNumber();
         if (saved) {
-          setValue('AccesionNumber', saved, { shouldValidate: true });
+          setValue("AccesionNumber", saved, { shouldValidate: true });
         }
       }
       loadSaved();
@@ -67,16 +85,17 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
 
       if (checkIsJsonService.isJson(scanValue)) {
         try {
-          const parsed = typeof scanValue === 'string' ? JSON.parse(scanValue) : scanValue;
-          const acc = parsed.AccesionNumber || parsed.accessionNumber || '';
-          const key = parsed.Key || parsed.key || '';
-          if (acc) setValue('AccesionNumber', acc, { shouldValidate: true });
-          if (key) setValue('Key', key, { shouldValidate: true });
+          const parsed =
+            typeof scanValue === "string" ? JSON.parse(scanValue) : scanValue;
+          const acc = parsed.AccesionNumber || parsed.accessionNumber || "";
+          const key = parsed.Key || parsed.key || "";
+          if (acc) setValue("AccesionNumber", acc, { shouldValidate: true });
+          if (key) setValue("Key", key, { shouldValidate: true });
         } catch {
-          setValue('Key', scanValue, { shouldValidate: true });
+          setValue("Key", scanValue, { shouldValidate: true });
         }
       } else {
-        setValue('Key', scanValue, { shouldValidate: true });
+        setValue("Key", scanValue, { shouldValidate: true });
       }
     }, [scanValue, setValue]);
 
@@ -91,17 +110,21 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
     }, [watch]);
 
     const hideDialog = () => {
+      fileService.cancelDownload();
       setDialogVisible(false);
       setDownloadProgress(null);
     };
 
-    const openReport = () => {
+    const openReport = async () => {
       const target = localFilePath || pdfUrl;
       if (target) {
-        if (Platform.OS === 'web') {
-          window.open(target, '_blank', 'noopener,noreferrer');
-        } else {
-          fileService.downloadAndOpenReport(target);
+        try {
+          await fileService.openReport(target);
+        } catch (err: any) {
+          Alert.alert(
+            "Error",
+            "Could not open document: " + (err?.message || ""),
+          );
         }
       }
       hideDialog();
@@ -117,14 +140,18 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
         const url = await reportService.getReportUrl(data);
         setPdfUrl(url);
         if (onNotification) {
-          onNotification('success', 'Report Found', 'Patient report URL retrieved successfully.');
+          onNotification(
+            "success",
+            "Report Found",
+            "Patient report URL retrieved successfully.",
+          );
         }
       } catch (err: any) {
-        const message = err?.message || 'Error getting report';
+        const message = err?.message || "Error getting report";
         if (onNotification) {
-          onNotification('error', 'Error getting report', message);
+          onNotification("error", "Error getting report", message);
         } else {
-          Alert.alert('Error getting report', message);
+          Alert.alert("Error getting report", message);
         }
       } finally {
         loading(false);
@@ -134,22 +161,25 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
     const handleDownload = async () => {
       if (!pdfUrl) return;
 
-      setDownloadProgress(10);
+      setDownloadProgress(0);
       setDialogVisible(true);
 
       try {
-        const savedPath = await fileService.downloadAndOpenReport(pdfUrl, (progress) => {
-          setDownloadProgress(progress);
-        });
+        const savedPath = await fileService.downloadReport(
+          pdfUrl,
+          (progress) => {
+            setDownloadProgress(progress);
+          },
+        );
         setLocalFilePath(savedPath);
         setDownloadProgress(100);
       } catch (err: any) {
         hideDialog();
-        const msg = err?.message || 'Failed to download report.';
+        const msg = err?.message || "Failed to download report.";
         if (onNotification) {
-          onNotification('error', 'Download Error', msg);
+          onNotification("error", "Download Error", msg);
         } else {
-          Alert.alert('Download Error', msg);
+          Alert.alert("Download Error", msg);
         }
       }
     };
@@ -161,14 +191,18 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
           <Controller
             control={control}
             name="AccesionNumber"
-            rules={{ required: 'Accession number is required!' }}
+            rules={{ required: "Accession number is required!" }}
             render={({ field: { onChange, onBlur, value } }) => (
               <TextInput
                 mode="outlined"
                 label="Accession number"
                 textColor={theme.colors.onSurface}
                 activeOutlineColor={theme.colors.primary}
-                outlineColor={errors.AccesionNumber ? theme.colors.error : theme.colors.outline}
+                outlineColor={
+                  errors.AccesionNumber
+                    ? theme.colors.error
+                    : theme.colors.outline
+                }
                 onBlur={onBlur}
                 onChangeText={onChange}
                 value={value}
@@ -191,14 +225,16 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
           <Controller
             control={control}
             name="Key"
-            rules={{ required: 'Report key is required!' }}
+            rules={{ required: "Report key is required!" }}
             render={({ field: { onChange, onBlur, value } }) => (
               <TextInput
                 mode="outlined"
                 label="Report key"
                 textColor={theme.colors.onSurface}
                 activeOutlineColor={theme.colors.primary}
-                outlineColor={errors.Key ? theme.colors.error : theme.colors.outline}
+                outlineColor={
+                  errors.Key ? theme.colors.error : theme.colors.outline
+                }
                 secureTextEntry={!isPasswordShow}
                 onBlur={onBlur}
                 onChangeText={onChange}
@@ -209,7 +245,7 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
                 ]}
                 right={
                   <TextInput.Icon
-                    icon={isPasswordShow ? 'eye-off' : 'eye'}
+                    icon={isPasswordShow ? "eye-off" : "eye"}
                     color={theme.colors.onSurfaceVariant}
                     onPress={() => setIsPasswordShow(!isPasswordShow)}
                   />
@@ -257,27 +293,18 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
             style={[
               styles.readyBanner,
               {
-                backgroundColor: theme.dark ? '#0c4a6e' : '#eff6ff',
-                borderColor: theme.dark ? '#0284c7' : '#bfdbfe',
+                backgroundColor: theme.dark ? "#0c4a6e" : "#eff6ff",
+                borderColor: theme.dark ? "#0284c7" : "#bfdbfe",
               },
             ]}
           >
             <Text
               style={[
                 styles.readyTitle,
-                { color: theme.dark ? '#bae6fd' : '#1e40af' },
+                { color: theme.dark ? "#bae6fd" : "#1e40af" },
               ]}
             >
               Report ready for download!
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.readyUrl,
-                { color: theme.dark ? '#7dd3fc' : '#64748b' },
-              ]}
-            >
-              {pdfUrl}
             </Text>
           </View>
         )}
@@ -290,31 +317,31 @@ const ReportForm = forwardRef<ReportFormHandle, ReportFormProps>(
           downloadProgress={downloadProgress}
           title={
             downloadProgress !== null && downloadProgress >= 100
-              ? 'Successfully downloaded!'
-              : 'Downloading report...'
+              ? "Successfully downloaded!"
+              : "Downloading report..."
           }
           reportUrl={pdfUrl}
         />
       </View>
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    width: "100%",
     paddingVertical: 8,
   },
   inputContainer: {
     marginBottom: 10,
   },
   input: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     fontSize: 15,
   },
   errorText: {
     paddingHorizontal: 4,
-    color: '#dc2626',
+    color: "#dc2626",
   },
   buttonsContainer: {
     marginTop: 8,
@@ -330,19 +357,19 @@ const styles = StyleSheet.create({
   readyBanner: {
     marginTop: 14,
     padding: 12,
-    backgroundColor: '#eff6ff',
+    backgroundColor: "#eff6ff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: "#bfdbfe",
   },
   readyTitle: {
     fontSize: 13,
-    fontWeight: 'bold',
-    color: '#1e40af',
+    fontWeight: "bold",
+    color: "#1e40af",
   },
   readyUrl: {
     fontSize: 11,
-    color: '#64748b',
+    color: "#64748b",
     marginTop: 2,
   },
 });
