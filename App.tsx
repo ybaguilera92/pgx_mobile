@@ -163,11 +163,8 @@ export default function App() {
                   <View style={styles.header}>
                     <View
                       style={[
-                        styles.logoWrapper,
-                        {
-                          backgroundColor: currentTheme.custom.logoBg,
-                          borderColor: currentTheme.custom.cardBorder,
-                        },
+                        styles.logoContainer,
+                        isDarkMode && styles.logoContainerDark,
                       ]}
                     >
                       <Image
@@ -355,18 +352,28 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
   },
-  logoWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 24,
+  logoContainer: {
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
     marginBottom: 16,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  logoContainerDark: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   logo: {
-    width: 78,
-    height: 78,
+    width: 240,
+    height: 105,
+    borderRadius: 16,
   },
   title: {
     fontSize: 24,
