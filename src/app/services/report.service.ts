@@ -1,24 +1,21 @@
+import { Injectable } from '@angular/core';
+import { ReportFormValues } from '../models/report.model';
+
 const PROXIED_URL = '/api/v1/diagnostic-project/patient-report';
 const DIRECT_URL = 'https://pgxstandalone30163.pgxsoftware.com/api/v1/diagnostic-project/patient-report';
 
-export interface ReportFormValues {
-  AccesionNumber: string;
-  Key: string;
-}
-
-function buildPatientReportBody(formValues: ReportFormValues): string {
-  const key = String(formValues.Key ?? '').trim();
-  const accesionNumber = String(formValues.AccesionNumber ?? '').trim();
-  return JSON.stringify({ key, accesionNumber });
-}
-
-export const reportService = {
-  getReportUrl: async function (formValues: ReportFormValues): Promise<string> {
-    const body = buildPatientReportBody(formValues);
+@Injectable({
+  providedIn: 'root'
+})
+export class ReportService {
+  async getReportUrl(formValues: ReportFormValues): Promise<string> {
+    const key = String(formValues.Key ?? '').trim();
+    const accesionNumber = String(formValues.AccesionNumber ?? '').trim();
+    const body = JSON.stringify({ key, accesionNumber });
 
     let lastError: Error | null = null;
 
-    // Try proxied endpoint first to avoid CORS issues in web dev
+    // 1. Try proxied endpoint first to avoid CORS issues in dev environment
     try {
       const response = await fetch(PROXIED_URL, {
         method: 'POST',
@@ -26,7 +23,7 @@ export const reportService = {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: body,
+        body,
       });
 
       if (response.ok) {
@@ -41,7 +38,7 @@ export const reportService = {
       console.warn('Proxied request failed, attempting direct fetch:', err.message);
     }
 
-    // Try direct fetch as fallback
+    // 2. Try direct fetch as fallback
     try {
       const response = await fetch(DIRECT_URL, {
         method: 'POST',
@@ -49,7 +46,7 @@ export const reportService = {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: body,
+        body,
       });
 
       if (response.ok) {
@@ -61,10 +58,9 @@ export const reportService = {
       }
     } catch (err: any) {
       console.warn('Direct fetch also failed:', err.message);
-      // If network failed (e.g. backend server is down or CORS blocked), throw descriptive error
       throw new Error(
         lastError?.message || err?.message || 'Unable to connect to PGx report server. Please check your network and credentials.'
       );
     }
-  },
-};
+  }
+}

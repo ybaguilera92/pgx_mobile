@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PGx Reports",
-    "slug": "pgxmobile",
+    "slug": "pgx-reports",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/icon.png",
@@ -12,43 +12,17 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.pgxappreports",
-      "infoPlist": {
-        "NSCameraUsageDescription": "PGx Reports needs camera access to scan QR codes."
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.pgxappreports",
-      "permissions": [
-        "android.permission.INTERNET",
-        "android.permission.CAMERA",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
-      ]
+      "package": "com.pgx.reports"
     },
     "web": {
-      "favicon": "./src/assets/images/favicon.png",
-      "bundler": "metro"
-    },
-    "plugins": [
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow PGx Reports to access your camera to scan report QR codes."
-        }
-      ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "eafaf1ea-6f39-40a5-8165-49e0f3a3be48"
-      }
-    },
-    "owner": "yoel.benedico"
+      "favicon": "./src/assets/images/favicon.png"
+    }
   }
 }

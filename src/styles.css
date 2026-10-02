@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #f8fafc;
+  --bg-card: #ffffff;
+  --border-card: #e2e8f0;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --brand-navy: #002E62;
+  --brand-blue: #0284c7;
+  --btn-tonal: #f1f5f9;
+  --input-bg: #f8fafc;
+  --input-border: #cbd5e1;
+}
+
+.dark {
+  --bg-primary: #0b1329;
+  --bg-card: #152238;
+  --border-card: #1e3a5f;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --brand-navy: #38bdf8;
+  --brand-blue: #0284c7;
+  --btn-tonal: #1e293b;
+  --input-bg: #0f172a;
+  --input-border: #334155;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+app-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: 100%;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Angular Native Custom Primitives Fallbacks for Web */
+view,
+scroll-view,
+safe-area-view,
+[data-rn='view'],
+[data-rn='scroll-view'],
+[data-rn='safe-area-view'] {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-sizing: border-box;
+}
+
+scroll-view,
+[data-rn='scroll-view'] {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+text,
+[data-rn='text'] {
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+pressable,
+[data-rn='pressable'] {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+image,
+[data-rn='image'] {
+  display: block;
+  box-sizing: border-box;
+}
+
+/* Custom scrollbar for mobile feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
