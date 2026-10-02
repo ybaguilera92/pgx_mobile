@@ -1,29 +1,7 @@
-/**
- * @format
- */
-import 'react-native-reanimated';
-import {AppRegistry} from 'react-native';
+import { registerRootComponent } from 'expo';
 import App from './App';
-import {name as appName} from './app.json';
-import * as React from 'react';
-import {DefaultTheme, Provider as PaperProvider} from 'react-native-paper';
 
-export const theme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: '#002E62',
-    secondary: '#3C8DBC',
-    accent: 'yellow',
-  },
-};
-
-export default function Main() {
-  return (
-    <PaperProvider theme={theme}>
-      <App />
-    </PaperProvider>
-  );
-}
-
-AppRegistry.registerComponent(appName, () => Main);
+// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+// It also ensures that whether you load the app in Expo Go or in a native build,
+// the environment is set up appropriately
+registerRootComponent(App);

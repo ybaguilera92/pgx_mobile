@@ -1,0 +1,6 @@
+{
+  "name": "PGx Reports",
+  "description": "Download and view PGx pharmacogenomics patient reports by entering or scanning an accession number and report key.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,135 +1,455 @@
-import React, {useRef, useState} from 'react';
+import React, { useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
   Text,
   View,
-  StatusBar,
   SafeAreaView,
   Image,
   useWindowDimensions,
   ScrollView,
-} from 'react-native';
-import {IconButton, Provider} from 'react-native-paper';
-import Spinner from 'react-native-loading-spinner-overlay';
-import Toast from 'react-native-toast-message';
-import {widthToDp as wp, heightToDp as hp} from 'rn-responsive-screen';
+  Platform,
+  ActivityIndicator,
+  useColorScheme,
+} from "react-native";
+import { PaperProvider, IconButton } from "react-native-paper";
+import { StatusBar } from "expo-status-bar";
 
-import {theme} from '.';
-import {QrCodeScan} from './src/components/QrCodeScan';
-import ReportForm from './src/components/ReportForm';
+import { QrCodeScan } from "./src/components/QrCodeScan";
+import ReportForm, { ReportFormHandle } from "./src/components/ReportForm";
+import { AppIcon } from "./src/components/AppIcon";
+import ErrorBoundary from "./src/components/ErrorBoundary";
+import { lightTheme, darkTheme } from "./src/theme";
+import { storageService } from "./src/services/StorageService";
+import logoImg from "./src/assets/images/logo-mini.png";
 
-import {notificationService} from './src/services/NotifierService';
+export { lightTheme, darkTheme };
+export const theme = lightTheme;
 
-const App = () => {
+interface NotificationState {
+  type: "success" | "error";
+  title: string;
+  message: string;
+}
+
+export default function App() {
+  const systemColorScheme = useColorScheme();
+  const [themePreference, setThemePreference] = useState<
+    "light" | "dark" | "system"
+  >("system");
   const [loading, setLoading] = useState(false);
   const [qrScan, setQrScan] = useState(false);
-  const [qrScanValue, setQrScanValue] = useState('');
+  const [qrScanValue, setQrScanValue] = useState("");
   const [isCancel, setIsCancel] = useState(false);
-  const childRef = useRef<any>();
+  const [notification, setNotification] = useState<NotificationState | null>(
+    null,
+  );
 
-  const toastConfig = {success: () => <></>};
+  const reportFormRef = useRef<ReportFormHandle | null>(null);
+  const { width, height } = useWindowDimensions();
+  const isLandscapeMode = width > height && width > 600;
 
-  const {width, height} = useWindowDimensions();
-  const isLandscapeMode = width > height ? true : false;
+  // Load saved theme preference
+  useEffect(() => {
+    async function loadTheme() {
+      const saved = await storageService.getThemeMode();
+      if (saved) {
+        setThemePreference(saved);
+      }
+    }
+    loadTheme();
+  }, []);
 
-  // Eliminamos el listener de eventos de notifee ya que react-native-push-notification
-  // maneja las notificaciones de forma diferente
-  // Las acciones se manejan directamente en la UI de la aplicación
+  const isDarkMode =
+    themePreference === "dark" ||
+    (themePreference === "system" && systemColorScheme === "dark");
+
+  const currentTheme = isDarkMode ? darkTheme : lightTheme;
+
+  const toggleTheme = async () => {
+    const nextMode = isDarkMode ? "light" : "dark";
+    setThemePreference(nextMode);
+    await storageService.saveThemeMode(nextMode);
+  };
+
+  const showNotification = (
+    type: "success" | "error",
+    title: string,
+    message: string,
+  ) => {
+    setNotification({ type, title, message });
+    setTimeout(() => {
+      setNotification((curr) => (curr?.title === title ? null : curr));
+    }, 6000);
+  };
 
   return (
-    <>
-      {!qrScan ? (
-        <>
-          <Provider theme={theme}>
-            <SafeAreaView style={styles.container}>
-              <Spinner
-                visible={loading}
-                textContent={'Loading...'}
-                textStyle={styles.spinnerTextStyle}
+    <ErrorBoundary fallbackTitle="Error en la aplicación">
+      <PaperProvider
+        theme={currentTheme}
+        {...(Platform.OS === "web"
+          ? {
+              settings: {
+                icon: (props: any) => <AppIcon {...props} />,
+              },
+            }
+          : {})}
+      >
+        <SafeAreaView
+          style={[
+            styles.safeArea,
+            {
+              backgroundColor: qrScan
+                ? "#000000"
+                : currentTheme.colors.background,
+            },
+          ]}
+        >
+          <StatusBar
+            style={qrScan ? "light" : isDarkMode ? "light" : "dark"}
+            backgroundColor={
+              qrScan ? "#000000" : currentTheme.colors.background
+            }
+          />
+
+          {!qrScan ? (
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.container}>
+                {/* Card wrapper */}
+                <View
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: currentTheme.custom.cardBackground,
+                      borderColor: currentTheme.custom.cardBorder,
+                    },
+                  ]}
+                >
+                  {/* Top Bar with Theme toggle & QR scan button */}
+                  <View style={styles.topBar}>
+                    <View style={styles.topBarActions}>
+                      {/* Theme toggle button */}
+                      <IconButton
+                        icon={
+                          isDarkMode ? "white-balance-sunny" : "weather-night"
+                        }
+                        iconColor={isDarkMode ? "#38bdf8" : "#002E62"}
+                        size={22}
+                        mode="contained-tonal"
+                        containerColor={currentTheme.custom.qrButtonBg}
+                        onPress={toggleTheme}
+                        accessibilityLabel="Cambiar tema claro u oscuro"
+                        style={styles.actionBtn}
+                      />
+
+                      {/* QR scan trigger button */}
+                      <IconButton
+                        icon="qrcode-scan"
+                        iconColor={isDarkMode ? "#38bdf8" : "#002E62"}
+                        size={22}
+                        mode="contained-tonal"
+                        containerColor={currentTheme.custom.qrButtonBg}
+                        onPress={() => setQrScan(true)}
+                        accessibilityLabel="Escanear código QR"
+                        style={styles.actionBtn}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Header branding */}
+                  <View style={styles.header}>
+                    <View
+                      style={[
+                        styles.logoContainer,
+                        isDarkMode && styles.logoContainerDark,
+                      ]}
+                    >
+                      <Image
+                        source={
+                          typeof logoImg === "string"
+                            ? { uri: logoImg }
+                            : logoImg
+                        }
+                        style={styles.logo}
+                        resizeMode="contain"
+                      />
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.subtitle,
+                        { color: currentTheme.custom.mutedText },
+                      ]}
+                    >
+                      Enter or scan your report key to download your PGx report
+                    </Text>
+                  </View>
+
+                  {/* Form Component */}
+                  <View style={styles.formContainer}>
+                    <ReportForm
+                      ref={reportFormRef}
+                      loading={setLoading}
+                      scanValue={qrScanValue}
+                      cancel={isCancel}
+                      qrScanValue={setQrScanValue}
+                      onNotification={showNotification}
+                    />
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+          ) : (
+            <QrCodeScan
+              onClear={setQrScan}
+              qrScanValue={(val) => {
+                setQrScanValue(val);
+                setQrScan(false);
+                showNotification(
+                  "success",
+                  "QR Code Scanned",
+                  "Parameters loaded from QR.",
+                );
+              }}
+              isLandscape={isLandscapeMode}
+            />
+          )}
+
+          {/* Global Loading Overlay */}
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <View
+                style={[
+                  styles.loadingCard,
+                  {
+                    backgroundColor: currentTheme.custom.cardBackground,
+                    borderColor: currentTheme.custom.cardBorder,
+                  },
+                ]}
+              >
+                <ActivityIndicator
+                  size="large"
+                  color={currentTheme.colors.primary}
+                />
+                <Text
+                  style={[
+                    styles.loadingCardText,
+                    { color: currentTheme.colors.onSurface },
+                  ]}
+                >
+                  Loading PGx Report...
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Toast / Notification Banner */}
+          {notification && (
+            <View
+              style={[
+                styles.toastBanner,
+                notification.type === "error"
+                  ? styles.toastError
+                  : styles.toastSuccess,
+                {
+                  backgroundColor:
+                    notification.type === "error"
+                      ? isDarkMode
+                        ? "#450a0a"
+                        : "#fef2f2"
+                      : isDarkMode
+                        ? "#052e16"
+                        : "#f0fdf4",
+                  borderColor:
+                    notification.type === "error"
+                      ? isDarkMode
+                        ? "#991b1b"
+                        : "#fca5a5"
+                      : isDarkMode
+                        ? "#166534"
+                        : "#86efac",
+                },
+              ]}
+            >
+              <View style={styles.toastTextContainer}>
+                <Text
+                  style={[
+                    styles.toastTitle,
+                    { color: currentTheme.colors.onSurface },
+                  ]}
+                >
+                  {notification.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.toastMessage,
+                    { color: currentTheme.custom.mutedText },
+                  ]}
+                >
+                  {notification.message}
+                </Text>
+              </View>
+              <IconButton
+                icon="close"
+                size={18}
+                iconColor={currentTheme.custom.mutedText}
+                onPress={() => setNotification(null)}
+                style={styles.toastClose}
               />
-              <ScrollView>
-                <View style={styles.qrContainer}>
-                  <IconButton
-                    icon="qrcode-scan"
-                    size={35}
-                    onPress={() => setQrScan(true)}
-                  />
-                </View>
-                <View style={styles.infoContainer}>
-                  <Image
-                    source={require('./src/assets/images/logo-mini.png')}
-                  />
-                  {!isLandscapeMode && (
-                    <>
-                      <Text style={styles.title}>PGx Reports</Text>
-                      <Text style={styles.subtitle}>
-                        Enter or scan your report key for download your PGx
-                        report
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <View style={styles.reportFormContainer}>
-                  <ReportForm
-                    scanValue={qrScanValue}
-                    cancel={isCancel}
-                    loading={setLoading}
-                    qrScanValue={setQrScanValue}
-                    ref={childRef}
-                  />
-                </View>
-              </ScrollView>
-            </SafeAreaView>
-          </Provider>
-          <Toast config={toastConfig} />
-        </>
-      ) : (
-        <QrCodeScan
-          onClear={setQrScan}
-          qrScanValue={setQrScanValue}
-          isLandscape={isLandscapeMode}
-        />
-      )}
-      <StatusBar backgroundColor={'white'} barStyle="dark-content" />
-    </>
+            </View>
+          )}
+        </SafeAreaView>
+      </PaperProvider>
+    </ErrorBoundary>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: 'white',
+    width: "100%",
+    height: "100%",
   },
-  qrContainer: {
-    alignItems: 'flex-end',
-    padding: hp(1),
-    marginTop: hp(6), // Baja el botón de escanear QR
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
   },
-  infoContainer: {
-    flex: 0.6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: hp(2), // Baja el logo
+  container: {
+    width: "100%",
+    maxWidth: 500,
+    alignSelf: "center",
+  },
+  card: {
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    shadowColor: "#002E62",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 4,
+  },
+  topBarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionBtn: {
+    margin: 0,
+  },
+  header: {
+    alignItems: "center",
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  logoContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  logoContainerDark: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  logo: {
+    width: 240,
+    height: 105,
+    borderRadius: 16,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    padding: hp(2),
+    fontSize: 24,
+    fontWeight: "bold",
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontWeight: 'bold',
-    paddingBottom: hp(2),
-    marginHorizontal: wp(4),
-    justifyContent: 'center',
-    textAlign: 'center',
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 4,
+    maxWidth: 320,
+    lineHeight: 20,
   },
-  reportFormContainer: {
+  formContainer: {
+    marginTop: 8,
+  },
+  footerNote: {
+    marginTop: 18,
+    alignItems: "center",
+  },
+  footerText: {
+    fontSize: 11,
+    textAlign: "center",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loadingCard: {
+    padding: 24,
+    borderRadius: 16,
+    alignItems: "center",
+    gap: 12,
+    minWidth: 200,
+    borderWidth: 1,
+    elevation: 8,
+  },
+  loadingCardText: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 8,
+  },
+  toastBanner: {
+    position: "absolute",
+    bottom: 24,
+    left: 20,
+    right: 20,
+    maxWidth: 420,
+    alignSelf: "center",
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    zIndex: 1000,
+    elevation: 6,
+  },
+  toastSuccess: {},
+  toastError: {},
+  toastTextContainer: {
     flex: 1,
-    padding: hp(2)
+    paddingRight: 8,
   },
-  spinnerTextStyle: {
-    color: '#FFF',
+  toastTitle: {
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+  toastMessage: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  toastClose: {
+    margin: 0,
   },
 });
-
-export default App;
